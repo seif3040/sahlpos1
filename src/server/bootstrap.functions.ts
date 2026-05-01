@@ -10,14 +10,14 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
  */
 export const ensureDefaultOwner = createServerFn({ method: "POST" }).handler(async () => {
   // already an owner? do nothing.
-  const { data: existingOwner } = await supabaseAdmin
+  const { data: existingOwners } = await supabaseAdmin
     .from("employees")
     .select("id,user_id,pin")
     .eq("role", "owner")
     .eq("active", true)
-    .limit(1)
-    .maybeSingle();
-  if (existingOwner) {
+    .not("user_id", "is", null)
+    .limit(1);
+  if (existingOwners && existingOwners.length > 0) {
     return { ok: true, created: false };
   }
 
@@ -57,12 +57,16 @@ export const findEmployeeByPin = createServerFn({ method: "POST" })
     return d;
   })
   .handler(async ({ data }) => {
-    const { data: emp } = await supabaseAdmin
+    const { data: emps, error } = await supabaseAdmin
       .from("employees")
       .select("id,user_id,name,role,pin,active")
       .eq("pin", data.pin)
       .eq("active", true)
-      .maybeSingle();
+      .not("user_id", "is", null)
+      .order("created_at", { ascending: true })
+      .limit(1);
+    if (error) throw new Error(error.message);
+    const emp = emps?.[0];
     if (!emp || !emp.user_id) return { found: false as const };
     return {
       found: true as const,
