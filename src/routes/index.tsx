@@ -208,7 +208,7 @@ function Dashboard() {
                     border: "1px solid hsl(var(--border))",
                     borderRadius: 8,
                   }}
-                  formatter={(v: number) => formatMoney(v, currency)}
+                  formatter={(v) => formatMoney(Number(v), currency)}
                 />
                 <Bar dataKey="total" fill="var(--color-chart-1)" radius={[8, 8, 0, 0]} />
               </BarChart>
