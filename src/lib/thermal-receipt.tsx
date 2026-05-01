@@ -180,10 +180,9 @@ export function printThermalReceipt(invoice: ReceiptData, settings: ReceiptSetti
       win.focus();
       win.print();
     };
-    // @ts-expect-error - fonts API exists in modern browsers
-    if (win.document.fonts && win.document.fonts.ready) {
-      // @ts-expect-error
-      win.document.fonts.ready.then(() => setTimeout(doPrint, 150));
+    const fontsReady = (win.document as Document & { fonts?: { ready: Promise<unknown> } }).fonts;
+    if (fontsReady?.ready) {
+      fontsReady.ready.then(() => setTimeout(doPrint, 150));
     } else {
       setTimeout(doPrint, 500);
     }
