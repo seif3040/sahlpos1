@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { formatMoney, formatDate } from "@/lib/format";
-import { downloadInvoicePDF, printInvoicePDF } from "@/lib/invoice-pdf";
+import { printThermalReceipt } from "@/lib/thermal-receipt";
 
 export const Route = createFileRoute("/sales")({
   component: () => (
@@ -207,7 +207,7 @@ function SalesPage() {
     // Print invoice
     if (settings) {
       const customer = customers.find((c) => c.id === customerId);
-      printInvoicePDF(
+      printThermalReceipt(
         {
           invoice_number: Number(sale.invoice_number),
           created_at: sale.created_at,
@@ -484,7 +484,7 @@ function RecentSalesDialog({
       .eq("id", id)
       .maybeSingle();
     if (!sale) return;
-    downloadInvoicePDF(
+    printThermalReceipt(
       {
         invoice_number: Number(sale.invoice_number),
         created_at: sale.created_at,
