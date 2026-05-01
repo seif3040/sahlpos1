@@ -10,14 +10,14 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
  */
 export const ensureDefaultOwner = createServerFn({ method: "POST" }).handler(async () => {
   // already an owner? do nothing.
-  const { data: existingOwner } = await supabaseAdmin
+  const { data: existingOwners } = await supabaseAdmin
     .from("employees")
     .select("id,user_id,pin")
     .eq("role", "owner")
     .eq("active", true)
-    .limit(1)
-    .maybeSingle();
-  if (existingOwner) {
+    .not("user_id", "is", null)
+    .limit(1);
+  if (existingOwners && existingOwners.length > 0) {
     return { ok: true, created: false };
   }
 
