@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { formatMoney, formatDate } from "@/lib/format";
-import { downloadInvoicePDF, printInvoicePDF } from "@/lib/invoice-pdf";
+import { printThermalReceipt } from "@/lib/thermal-receipt";
 
 export const Route = createFileRoute("/sales")({
   component: () => (
