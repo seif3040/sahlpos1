@@ -29,6 +29,19 @@ function CustomersPage() {
   const [payOpen, setPayOpen] = useState<Debt | null>(null);
   const [payAmount, setPayAmount] = useState(0);
   const [currency, setCurrency] = useState("ج.م");
+  const [historyFor, setHistoryFor] = useState<Customer | null>(null);
+  const [historySales, setHistorySales] = useState<Array<{ id: string; invoice_number: number; total: number; created_at: string; payment_method: string }>>([]);
+
+  const openHistory = async (c: Customer) => {
+    setHistoryFor(c);
+    const { data } = await supabase
+      .from("sales")
+      .select("id,invoice_number,total,created_at,payment_method")
+      .eq("customer_id", c.id)
+      .order("created_at", { ascending: false })
+      .limit(100);
+    setHistorySales((data ?? []) as typeof historySales);
+  };
 
   const load = async () => {
     const [{ data: c }, { data: d }, { data: s }] = await Promise.all([
