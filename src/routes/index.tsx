@@ -72,7 +72,7 @@ function Dashboard() {
           .lte("created_at", endISO),
         supabase
           .from("sales")
-          .select("created_at,total,is_refunded,sale_items(product_name,quantity,refunded_quantity,unit_price))")
+          .select("created_at,total,is_refunded,sale_items(product_name,quantity,refunded_quantity,unit_price)")
           .eq("is_refunded", false)
           .gte("created_at", new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString()),
         supabase.from("customer_debts").select("remaining").eq("is_settled", false),
