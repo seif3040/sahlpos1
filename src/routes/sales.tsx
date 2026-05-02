@@ -536,7 +536,7 @@ function RecentSalesDialog({
   sales: RecentSale[];
   settings: SettingsRow | null;
 }) {
-  const reprint = async (id: string) => {
+  const reprint = async (id: string, format: "thermal" | "a4" = "thermal") => {
     if (!settings) return;
     const { data: sale } = await supabase
       .from("sales")
@@ -558,6 +558,7 @@ function RecentSalesDialog({
         total: Number(sale.total),
       },
       settings,
+      format,
     );
   };
 
