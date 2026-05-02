@@ -387,6 +387,7 @@ export type Database = {
           product_id: string | null
           product_name: string
           quantity: number
+          refunded_quantity: number
           sale_id: string | null
           unit_price: number
         }
@@ -397,6 +398,7 @@ export type Database = {
           product_id?: string | null
           product_name: string
           quantity: number
+          refunded_quantity?: number
           sale_id?: string | null
           unit_price: number
         }
@@ -407,6 +409,7 @@ export type Database = {
           product_id?: string | null
           product_name?: string
           quantity?: number
+          refunded_quantity?: number
           sale_id?: string | null
           unit_price?: number
         }
@@ -429,7 +432,11 @@ export type Database = {
       }
       sales: {
         Row: {
+          card_part: number
+          cash_part: number
+          cash_received: number
           cashier_id: string | null
+          change_amount: number
           created_at: string
           customer_id: string | null
           discount: number
@@ -443,7 +450,11 @@ export type Database = {
           total: number
         }
         Insert: {
+          card_part?: number
+          cash_part?: number
+          cash_received?: number
           cashier_id?: string | null
+          change_amount?: number
           created_at?: string
           customer_id?: string | null
           discount?: number
@@ -457,7 +468,11 @@ export type Database = {
           total?: number
         }
         Update: {
+          card_part?: number
+          cash_part?: number
+          cash_received?: number
           cashier_id?: string | null
+          change_amount?: number
           created_at?: string
           customer_id?: string | null
           discount?: number
@@ -622,6 +637,10 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      refund_sale_item: {
+        Args: { _item_id: string; _qty: number }
+        Returns: undefined
       }
     }
     Enums: {
