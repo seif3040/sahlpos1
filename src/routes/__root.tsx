@@ -5,6 +5,7 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { Toaster } from "sonner";
 import { ThemeProvider } from "next-themes";
 import { AuthProvider } from "@/lib/auth-context";
