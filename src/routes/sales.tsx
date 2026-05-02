@@ -403,17 +403,51 @@ function SalesPage() {
 
             <div>
               <Label className="text-xs">طريقة الدفع</Label>
-              <Select value={paymentMethod} onValueChange={(v) => setPaymentMethod(v as "cash" | "card" | "deferred")}>
+              <Select value={paymentMethod} onValueChange={(v) => setPaymentMethod(v as "cash" | "card" | "mixed" | "deferred")}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="cash">نقدي</SelectItem>
                   <SelectItem value="card">بطاقة</SelectItem>
+                  <SelectItem value="mixed">مختلط (نقدي + بطاقة)</SelectItem>
                   <SelectItem value="deferred">آجل</SelectItem>
                 </SelectContent>
               </Select>
             </div>
+
+            {paymentMethod === "mixed" && (
+              <div>
+                <Label className="text-xs">المبلغ بالبطاقة</Label>
+                <Input
+                  type="number"
+                  value={cardPart}
+                  onChange={(e) => setCardPart(Number(e.target.value) || 0)}
+                  min={0}
+                  max={total}
+                />
+                <div className="text-xs text-muted-foreground mt-1">
+                  المتبقي نقدي: {formatMoney(cashPart, settings?.currency)}
+                </div>
+              </div>
+            )}
+
+            {(paymentMethod === "cash" || paymentMethod === "mixed") && (
+              <div>
+                <Label className="text-xs">المبلغ المستلم نقداً</Label>
+                <Input
+                  type="number"
+                  value={cashReceived}
+                  onChange={(e) => setCashReceived(Number(e.target.value) || 0)}
+                  min={0}
+                />
+                {changeAmount > 0 && (
+                  <div className="text-sm font-bold text-green-600 mt-1">
+                    الباقي: {formatMoney(changeAmount, settings?.currency)}
+                  </div>
+                )}
+              </div>
+            )}
 
             {paymentMethod === "deferred" && (
               <div>
