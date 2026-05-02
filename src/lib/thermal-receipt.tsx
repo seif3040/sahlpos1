@@ -133,9 +133,62 @@ export function ThermalReceipt({
  * Future ESC/POS support: swap this function with a QZ Tray dispatcher
  * that sends raw ESC/POS commands to the printer queue.
  */
-export function printThermalReceipt(invoice: ReceiptData, settings: ReceiptSettings) {
+export function printThermalReceipt(invoice: ReceiptData, settings: ReceiptSettings, format: "thermal" | "a4" = "thermal") {
   const win = window.open("", "_blank", "width=400,height=600");
   if (!win) return;
+
+  const isA4 = format === "a4";
+
+  const a4Css = `
+    @page { size: A4; margin: 15mm; }
+    html, body { background: #fff; color: #000; font-family: 'Cairo', 'Tahoma', sans-serif; }
+    body { padding: 0; max-width: 180mm; margin: 0 auto; }
+    .thermal-receipt { width: 100%; font-size: 14px; line-height: 1.6; color: #000; }
+    .tr-header { text-align: center; padding-bottom: 12px; border-bottom: 2px solid #000; }
+    .tr-shop { font-size: 26px; font-weight: 700; }
+    .tr-sub { font-size: 13px; color: #333; }
+    .tr-divider { border-top: 1px solid #ccc; margin: 12px 0; }
+    .tr-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 24px; padding: 12px 0; }
+    .tr-meta > div { display: flex; justify-content: space-between; font-size: 13px; padding: 4px 0; border-bottom: 1px dotted #ccc; }
+    .tr-items { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+    .tr-items th { background: #f3f4f6; padding: 8px; border: 1px solid #ccc; font-weight: 700; }
+    .tr-items td { padding: 8px; border: 1px solid #e5e7eb; }
+    .tr-name { text-align: right; }
+    .tr-qty  { text-align: center; width: 80px; }
+    .tr-price{ text-align: left; width: 120px; white-space: nowrap; }
+    .tr-totals { margin-top: 16px; margin-right: auto; margin-left: 0; width: 50%; }
+    .tr-totals > div { display: flex; justify-content: space-between; font-size: 14px; padding: 6px 0; border-bottom: 1px dotted #ccc; }
+    .tr-grand { font-size: 18px; font-weight: 700; border-top: 2px solid #000 !important; border-bottom: 2px solid #000; padding: 8px 0 !important; margin-top: 4px; }
+    .tr-footer { text-align: center; margin-top: 24px; padding-top: 12px; border-top: 1px solid #ccc; font-size: 13px; color: #555; }
+    @media print { .no-print { display: none !important; } }
+  `;
+
+  const thermalCss = `
+    @page { size: 80mm auto; margin: 0; }
+    html, body { background: #fff; color: #000; font-family: 'Cairo', 'Tahoma', sans-serif; }
+    body { padding: 6mm 4mm; }
+    .thermal-receipt { width: 72mm; margin: 0 auto; font-size: 12px; line-height: 1.45; color: #000; }
+    .tr-header { text-align: center; }
+    .tr-shop { font-size: 16px; font-weight: 700; }
+    .tr-sub { font-size: 11px; }
+    .tr-divider { border-top: 1px dashed #000; margin: 6px 0; }
+    .tr-meta > div { display: flex; justify-content: space-between; gap: 8px; font-size: 11px; }
+    .tr-items { width: 100%; border-collapse: collapse; font-size: 11px; }
+    .tr-items th, .tr-items td { padding: 2px 0; vertical-align: top; }
+    .tr-items thead th { border-bottom: 1px solid #000; font-weight: 700; }
+    .tr-name { text-align: right; width: 55%; word-break: break-word; }
+    .tr-qty  { text-align: center; width: 15%; }
+    .tr-price{ text-align: left; width: 30%; white-space: nowrap; }
+    .tr-totals > div { display: flex; justify-content: space-between; font-size: 12px; padding: 1px 0; }
+    .tr-grand { font-size: 14px; font-weight: 700; border-top: 1px solid #000; padding-top: 4px !important; margin-top: 4px; }
+    .tr-footer { text-align: center; margin-top: 6px; font-size: 11px; }
+    @media print {
+      html, body { width: 80mm; background: #fff; }
+      body { padding: 2mm; }
+      .thermal-receipt { width: 76mm; page-break-inside: avoid; }
+      .no-print { display: none !important; }
+    }
+  `;
 
   win.document.open();
   win.document.write(`<!doctype html>
@@ -148,32 +201,7 @@ export function printThermalReceipt(invoice: ReceiptData, settings: ReceiptSetti
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet" />
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  html, body { background: #fff; color: #000; font-family: 'Cairo', 'Tahoma', sans-serif; }
-  body { padding: 6mm 4mm; }
-  .thermal-receipt { width: 72mm; margin: 0 auto; font-size: 12px; line-height: 1.45; color: #000; }
-  .tr-header { text-align: center; }
-  .tr-shop { font-size: 16px; font-weight: 700; }
-  .tr-sub { font-size: 11px; }
-  .tr-divider { border-top: 1px dashed #000; margin: 6px 0; }
-  .tr-meta > div { display: flex; justify-content: space-between; gap: 8px; font-size: 11px; }
-  .tr-meta span { color: #000; }
-  .tr-items { width: 100%; border-collapse: collapse; font-size: 11px; }
-  .tr-items th, .tr-items td { padding: 2px 0; vertical-align: top; }
-  .tr-items thead th { border-bottom: 1px solid #000; font-weight: 700; }
-  .tr-name { text-align: right; width: 55%; word-break: break-word; }
-  .tr-qty  { text-align: center; width: 15%; }
-  .tr-price{ text-align: left; width: 30%; white-space: nowrap; }
-  .tr-totals > div { display: flex; justify-content: space-between; font-size: 12px; padding: 1px 0; }
-  .tr-grand { font-size: 14px; font-weight: 700; border-top: 1px solid #000; padding-top: 4px !important; margin-top: 4px; }
-  .tr-footer { text-align: center; margin-top: 6px; font-size: 11px; }
-
-  @page { size: 80mm auto; margin: 0; }
-  @media print {
-    html, body { width: 80mm; background: #fff; }
-    body { padding: 2mm; }
-    .thermal-receipt { width: 76mm; page-break-inside: avoid; }
-    .no-print { display: none !important; }
-  }
+  ${isA4 ? a4Css : thermalCss}
 </style>
 </head>
 <body>
@@ -185,23 +213,15 @@ export function printThermalReceipt(invoice: ReceiptData, settings: ReceiptSetti
 </html>`);
   win.document.close();
 
-  // Render React tree into the new window
   const mount = () => {
     const root = win.document.getElementById("receipt-root");
     if (!root) return;
     const r = createRoot(root);
     r.render(<ThermalReceipt invoice={invoice} settings={settings} />);
-    // Wait for fonts to load before printing
-    const doPrint = () => {
-      win.focus();
-      win.print();
-    };
+    const doPrint = () => { win.focus(); win.print(); };
     const fontsReady = (win.document as Document & { fonts?: { ready: Promise<unknown> } }).fonts;
-    if (fontsReady?.ready) {
-      fontsReady.ready.then(() => setTimeout(doPrint, 150));
-    } else {
-      setTimeout(doPrint, 500);
-    }
+    if (fontsReady?.ready) fontsReady.ready.then(() => setTimeout(doPrint, 150));
+    else setTimeout(doPrint, 500);
   };
 
   if (win.document.readyState === "complete") mount();
