@@ -114,15 +114,21 @@ function Dashboard() {
     for (const s of items7 ?? []) {
       const d = new Date(s.created_at);
       const key = d.toLocaleDateString("ar-EG", { weekday: "short" });
-      dayMap.set(key, (dayMap.get(key) ?? 0) + Number(s.total));
+      let net = 0;
+      for (const it of (s as { sale_items?: { product_name: string; quantity: number; refunded_quantity?: number; unit_price: number }[] }).sale_items ?? []) {
+        const eff = Number(it.quantity) - Number(it.refunded_quantity ?? 0);
+        if (eff > 0) net += Number(it.unit_price) * eff;
+      }
+      dayMap.set(key, (dayMap.get(key) ?? 0) + net);
     }
     setSalesByDay(Array.from(dayMap, ([day, total]) => ({ day, total })));
 
-    // top products
+    // top products (net of refunds)
     const prodMap = new Map<string, number>();
     for (const s of items7 ?? []) {
-      for (const it of (s as { sale_items?: { product_name: string; quantity: number }[] }).sale_items ?? []) {
-        prodMap.set(it.product_name, (prodMap.get(it.product_name) ?? 0) + Number(it.quantity));
+      for (const it of (s as { sale_items?: { product_name: string; quantity: number; refunded_quantity?: number }[] }).sale_items ?? []) {
+        const eff = Number(it.quantity) - Number(it.refunded_quantity ?? 0);
+        if (eff > 0) prodMap.set(it.product_name, (prodMap.get(it.product_name) ?? 0) + eff);
       }
     }
     const top = Array.from(prodMap, ([name, qty]) => ({ name, qty }))
