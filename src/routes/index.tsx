@@ -84,10 +84,14 @@ function Dashboard() {
     let sumSales = 0;
     let sumProfit = 0;
     for (const s of salesToday ?? []) {
-      sumSales += Number(s.total);
-      for (const it of (s as { sale_items?: { quantity: number; unit_price: number; cost_price: number }[] }).sale_items ?? []) {
-        sumProfit += (Number(it.unit_price) - Number(it.cost_price)) * Number(it.quantity);
+      let saleNet = 0;
+      for (const it of (s as { sale_items?: { quantity: number; refunded_quantity?: number; unit_price: number; cost_price: number }[] }).sale_items ?? []) {
+        const eff = Number(it.quantity) - Number(it.refunded_quantity ?? 0);
+        if (eff <= 0) continue;
+        saleNet += Number(it.unit_price) * eff;
+        sumProfit += (Number(it.unit_price) - Number(it.cost_price)) * eff;
       }
+      sumSales += saleNet;
     }
     const debtsSum = (debts ?? []).reduce((a, d) => a + Number(d.remaining), 0);
 
