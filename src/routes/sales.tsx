@@ -76,8 +76,10 @@ function SalesPage() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [discountType, setDiscountType] = useState<"percent" | "fixed">("percent");
   const [discountValue, setDiscountValue] = useState(0);
-  const [paymentMethod, setPaymentMethod] = useState<"cash" | "card" | "deferred">("cash");
+  const [paymentMethod, setPaymentMethod] = useState<"cash" | "card" | "mixed" | "deferred">("cash");
   const [customerId, setCustomerId] = useState<string>("");
+  const [cashReceived, setCashReceived] = useState<number>(0);
+  const [cardPart, setCardPart] = useState<number>(0);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [recentSales, setRecentSales] = useState<RecentSale[]>([]);
 
@@ -153,6 +155,12 @@ function SalesPage() {
   const taxAmt = (taxableAmt * (settings?.tax_percent ?? 0)) / 100;
   const total = taxableAmt + taxAmt;
 
+  const cashPart = paymentMethod === "mixed" ? Math.max(0, total - cardPart) : paymentMethod === "cash" ? total : 0;
+  const effectiveCardPart = paymentMethod === "mixed" ? cardPart : paymentMethod === "card" ? total : 0;
+  const changeAmount = paymentMethod === "cash" || paymentMethod === "mixed"
+    ? Math.max(0, cashReceived - cashPart)
+    : 0;
+
   const checkout = async () => {
     if (cart.length === 0) {
       toast.error("السلة فارغة");
@@ -160,6 +168,14 @@ function SalesPage() {
     }
     if (paymentMethod === "deferred" && !customerId) {
       toast.error("اختر العميل للبيع الآجل");
+      return;
+    }
+    if ((paymentMethod === "cash" || paymentMethod === "mixed") && cashReceived < cashPart) {
+      toast.error("المبلغ المستلم أقل من المطلوب");
+      return;
+    }
+    if (paymentMethod === "mixed" && (cardPart <= 0 || cardPart >= total)) {
+      toast.error("في الدفع المختلط يجب تحديد جزء بالبطاقة بين 0 والمجموع");
       return;
     }
 
@@ -173,6 +189,10 @@ function SalesPage() {
         tax: taxAmt,
         total,
         payment_method: paymentMethod,
+        cash_received: cashReceived,
+        change_amount: changeAmount,
+        cash_part: cashPart,
+        card_part: effectiveCardPart,
       })
       .select("id,invoice_number,created_at")
       .single();
@@ -192,7 +212,9 @@ function SalesPage() {
     }));
     const { error: itemsErr } = await supabase.from("sale_items").insert(itemsPayload);
     if (itemsErr) {
-      toast.error("فشل حفظ المنتجات");
+      // rollback the sale
+      await supabase.from("sales").delete().eq("id", sale.id);
+      toast.error(itemsErr.message || "فشل حفظ المنتجات - تم التراجع");
       return;
     }
 
@@ -202,7 +224,7 @@ function SalesPage() {
         .insert({ customer_id: customerId, sale_id: sale.id, amount: total });
     }
 
-    toast.success(`تم الحفظ - فاتورة #${sale.invoice_number}`);
+    toast.success(`تم الحفظ - فاتورة #${sale.invoice_number}${changeAmount > 0 ? ` - الباقي: ${changeAmount.toFixed(2)}` : ""}`);
 
     // Print invoice
     if (settings) {
@@ -224,6 +246,10 @@ function SalesPage() {
           discount: discountAmt,
           tax: taxAmt,
           total,
+          cash_received: cashReceived,
+          change_amount: changeAmount,
+          cash_part: cashPart,
+          card_part: effectiveCardPart,
         },
         settings,
       );
@@ -233,6 +259,8 @@ function SalesPage() {
     setDiscountValue(0);
     setCustomerId("");
     setPaymentMethod("cash");
+    setCashReceived(0);
+    setCardPart(0);
     void load();
   };
 
@@ -375,17 +403,51 @@ function SalesPage() {
 
             <div>
               <Label className="text-xs">طريقة الدفع</Label>
-              <Select value={paymentMethod} onValueChange={(v) => setPaymentMethod(v as "cash" | "card" | "deferred")}>
+              <Select value={paymentMethod} onValueChange={(v) => setPaymentMethod(v as "cash" | "card" | "mixed" | "deferred")}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="cash">نقدي</SelectItem>
                   <SelectItem value="card">بطاقة</SelectItem>
+                  <SelectItem value="mixed">مختلط (نقدي + بطاقة)</SelectItem>
                   <SelectItem value="deferred">آجل</SelectItem>
                 </SelectContent>
               </Select>
             </div>
+
+            {paymentMethod === "mixed" && (
+              <div>
+                <Label className="text-xs">المبلغ بالبطاقة</Label>
+                <Input
+                  type="number"
+                  value={cardPart}
+                  onChange={(e) => setCardPart(Number(e.target.value) || 0)}
+                  min={0}
+                  max={total}
+                />
+                <div className="text-xs text-muted-foreground mt-1">
+                  المتبقي نقدي: {formatMoney(cashPart, settings?.currency)}
+                </div>
+              </div>
+            )}
+
+            {(paymentMethod === "cash" || paymentMethod === "mixed") && (
+              <div>
+                <Label className="text-xs">المبلغ المستلم نقداً</Label>
+                <Input
+                  type="number"
+                  value={cashReceived}
+                  onChange={(e) => setCashReceived(Number(e.target.value) || 0)}
+                  min={0}
+                />
+                {changeAmount > 0 && (
+                  <div className="text-sm font-bold text-green-600 mt-1">
+                    الباقي: {formatMoney(changeAmount, settings?.currency)}
+                  </div>
+                )}
+              </div>
+            )}
 
             {paymentMethod === "deferred" && (
               <div>
@@ -500,29 +562,23 @@ function RecentSalesDialog({
   };
 
   const refund = async (id: string) => {
-    if (!confirm("هل تريد استرجاع هذه الفاتورة؟ سيتم إعادة المنتجات للمخزون.")) return;
+    if (!confirm("هل تريد استرجاع كامل الفاتورة؟")) return;
     const { data: items } = await supabase
       .from("sale_items")
-      .select("product_id,quantity")
+      .select("id,quantity,refunded_quantity")
       .eq("sale_id", id);
     for (const it of items ?? []) {
-      if (it.product_id) {
-        const { data: p } = await supabase
-          .from("products")
-          .select("quantity")
-          .eq("id", it.product_id)
-          .maybeSingle();
-        if (p) {
-          await supabase
-            .from("products")
-            .update({ quantity: Number(p.quantity) + Number(it.quantity) })
-            .eq("id", it.product_id);
-        }
+      const remaining = Number(it.quantity) - Number(it.refunded_quantity ?? 0);
+      if (remaining > 0) {
+        const { error } = await supabase.rpc("refund_sale_item", { _item_id: it.id, _qty: remaining });
+        if (error) { toast.error(error.message); return; }
       }
     }
     await supabase.from("sales").update({ is_refunded: true }).eq("id", id);
     toast.success("تم الاسترجاع");
   };
+
+  const [partialFor, setPartialFor] = useState<string | null>(null);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -549,14 +605,86 @@ function RecentSalesDialog({
                 طباعة
               </Button>
               {!s.is_refunded && (
-                <Button size="sm" variant="destructive" onClick={() => refund(s.id)}>
-                  استرجاع
-                </Button>
+                <>
+                  <Button size="sm" variant="outline" onClick={() => setPartialFor(s.id)}>
+                    مرتجع جزئي
+                  </Button>
+                  <Button size="sm" variant="destructive" onClick={() => refund(s.id)}>
+                    استرجاع كامل
+                  </Button>
+                </>
               )}
             </div>
           ))}
         </div>
         <DialogFooter />
+      </DialogContent>
+      <PartialRefundDialog saleId={partialFor} onClose={() => setPartialFor(null)} currency={settings?.currency} />
+    </Dialog>
+  );
+}
+
+interface SaleItemRow { id: string; product_name: string; quantity: number; unit_price: number; refunded_quantity: number }
+
+function PartialRefundDialog({ saleId, onClose, currency }: { saleId: string | null; onClose: () => void; currency?: string }) {
+  const [items, setItems] = useState<SaleItemRow[]>([]);
+  const [qtys, setQtys] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    if (!saleId) { setItems([]); setQtys({}); return; }
+    void (async () => {
+      const { data } = await supabase
+        .from("sale_items")
+        .select("id,product_name,quantity,unit_price,refunded_quantity")
+        .eq("sale_id", saleId);
+      setItems((data ?? []) as SaleItemRow[]);
+      setQtys({});
+    })();
+  }, [saleId]);
+
+  const submit = async () => {
+    const entries = Object.entries(qtys).filter(([, v]) => v > 0);
+    if (entries.length === 0) { toast.error("اختر كمية للاسترجاع"); return; }
+    for (const [id, q] of entries) {
+      const { error } = await supabase.rpc("refund_sale_item", { _item_id: id, _qty: q });
+      if (error) { toast.error(error.message); return; }
+    }
+    toast.success("تم الاسترجاع الجزئي");
+    onClose();
+  };
+
+  return (
+    <Dialog open={!!saleId} onOpenChange={v => !v && onClose()}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader><DialogTitle>مرتجع جزئي</DialogTitle></DialogHeader>
+        <div className="space-y-2 max-h-[50vh] overflow-y-auto">
+          {items.map(it => {
+            const remaining = Number(it.quantity) - Number(it.refunded_quantity);
+            return (
+              <div key={it.id} className="flex items-center gap-2 p-2 border rounded">
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium truncate">{it.product_name}</div>
+                  <div className="text-xs text-muted-foreground">
+                    متبقي للاسترجاع: {remaining} • {formatMoney(it.unit_price, currency)}
+                  </div>
+                </div>
+                <Input
+                  type="number"
+                  min={0}
+                  max={remaining}
+                  value={qtys[it.id] ?? 0}
+                  onChange={e => setQtys(p => ({ ...p, [it.id]: Math.min(remaining, Math.max(0, Number(e.target.value) || 0)) }))}
+                  className="w-20"
+                  disabled={remaining <= 0}
+                />
+              </div>
+            );
+          })}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>إلغاء</Button>
+          <Button onClick={submit}>تأكيد الاسترجاع</Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

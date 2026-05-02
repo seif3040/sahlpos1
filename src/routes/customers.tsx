@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Plus, Trash2, Pencil, MessageCircle } from "lucide-react";
+import { Plus, Trash2, Pencil, MessageCircle, History } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { RequireAuth } from "@/components/require-auth";
@@ -29,6 +29,19 @@ function CustomersPage() {
   const [payOpen, setPayOpen] = useState<Debt | null>(null);
   const [payAmount, setPayAmount] = useState(0);
   const [currency, setCurrency] = useState("ج.م");
+  const [historyFor, setHistoryFor] = useState<Customer | null>(null);
+  const [historySales, setHistorySales] = useState<Array<{ id: string; invoice_number: number; total: number; created_at: string; payment_method: string }>>([]);
+
+  const openHistory = async (c: Customer) => {
+    setHistoryFor(c);
+    const { data } = await supabase
+      .from("sales")
+      .select("id,invoice_number,total,created_at,payment_method")
+      .eq("customer_id", c.id)
+      .order("created_at", { ascending: false })
+      .limit(100);
+    setHistorySales((data ?? []) as typeof historySales);
+  };
 
   const load = async () => {
     const [{ data: c }, { data: d }, { data: s }] = await Promise.all([
@@ -94,6 +107,7 @@ function CustomersPage() {
                   <TableCell>{c.phone ?? "-"}</TableCell>
                   <TableCell>{owe > 0 ? <Badge variant="destructive">{formatMoney(owe, currency)}</Badge> : <Badge variant="secondary">سداد</Badge>}</TableCell>
                   <TableCell className="text-left">
+                    <Button size="icon" variant="ghost" title="السجل" onClick={() => openHistory(c)}><History className="h-4 w-4" /></Button>
                     <Button size="icon" variant="ghost" onClick={() => { setEditing(c); setForm({ name: c.name, phone: c.phone ?? "", notes: c.notes ?? "" }); setOpen(true); }}><Pencil className="h-4 w-4" /></Button>
                     <Button size="icon" variant="ghost" className="text-destructive" onClick={() => del(c.id)}><Trash2 className="h-4 w-4" /></Button>
                   </TableCell>
@@ -144,6 +158,32 @@ function CustomersPage() {
           <DialogHeader><DialogTitle>تسجيل دفعة</DialogTitle></DialogHeader>
           <div><Label>المبلغ</Label><Input type="number" value={payAmount} onChange={e => setPayAmount(Number(e.target.value) || 0)} /></div>
           <DialogFooter><Button variant="outline" onClick={() => setPayOpen(null)}>إلغاء</Button><Button onClick={pay}>تأكيد</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!historyFor} onOpenChange={v => !v && setHistoryFor(null)}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>سجل مشتريات: {historyFor?.name}</DialogTitle></DialogHeader>
+          {historySales.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">لا توجد فواتير</div>
+          ) : (
+            <Table>
+              <TableHeader><TableRow><TableHead>الفاتورة</TableHead><TableHead>التاريخ</TableHead><TableHead>الدفع</TableHead><TableHead>الإجمالي</TableHead></TableRow></TableHeader>
+              <TableBody>
+                {historySales.map(s => (
+                  <TableRow key={s.id}>
+                    <TableCell>#{s.invoice_number}</TableCell>
+                    <TableCell>{formatDate(s.created_at)}</TableCell>
+                    <TableCell>{s.payment_method}</TableCell>
+                    <TableCell className="font-bold">{formatMoney(Number(s.total), currency)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+          <DialogFooter>
+            <div className="text-sm text-muted-foreground ml-auto">إجمالي: <strong>{formatMoney(historySales.reduce((a, s) => a + Number(s.total), 0), currency)}</strong></div>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
