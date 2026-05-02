@@ -482,6 +482,8 @@ function ProductsPage() {
 
 function CategoriesTab({ categories, reload }: { categories: Category[]; reload: () => Promise<void> }) {
   const [name, setName] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
   const add = async () => {
     if (!name.trim()) return;
     const { error } = await supabase.from("categories").insert({ name: name.trim() });
@@ -489,28 +491,49 @@ function CategoriesTab({ categories, reload }: { categories: Category[]; reload:
     setName("");
     void reload();
   };
+  const save = async (id: string) => {
+    if (!editName.trim()) return;
+    const { error } = await supabase.from("categories").update({ name: editName.trim() }).eq("id", id);
+    if (error) return toast.error(error.message);
+    setEditingId(null);
+    void reload();
+  };
   const del = async (id: string) => {
-    if (!confirm("حذف القسم؟")) return;
-    await supabase.from("categories").delete().eq("id", id);
+    if (!confirm("حذف القسم؟ لن يتم حذف المنتجات لكن ستفقد التصنيف.")) return;
+    const { error } = await supabase.from("categories").delete().eq("id", id);
+    if (error) return toast.error(error.message);
     void reload();
   };
   return (
     <Card>
       <CardContent className="p-4 space-y-3">
         <div className="flex gap-2">
-          <Input placeholder="اسم القسم" value={name} onChange={(e) => setName(e.target.value)} />
-          <Button onClick={add}>إضافة</Button>
+          <Input placeholder="اسم القسم" value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && add()} />
+          <Button onClick={add}><Plus className="h-4 w-4 ml-2" />إضافة</Button>
         </div>
         <div className="space-y-2">
           {categories.length === 0 ? (
             <div className="text-center text-muted-foreground py-6">لا توجد أقسام</div>
           ) : (
             categories.map((c) => (
-              <div key={c.id} className="flex items-center justify-between border rounded-lg p-3">
-                <span>{c.name}</span>
-                <Button size="icon" variant="ghost" className="text-destructive" onClick={() => del(c.id)}>
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+              <div key={c.id} className="flex items-center justify-between gap-2 border rounded-lg p-3">
+                {editingId === c.id ? (
+                  <>
+                    <Input value={editName} onChange={(e) => setEditName(e.target.value)} className="flex-1" />
+                    <Button size="sm" onClick={() => save(c.id)}>حفظ</Button>
+                    <Button size="sm" variant="ghost" onClick={() => setEditingId(null)}>إلغاء</Button>
+                  </>
+                ) : (
+                  <>
+                    <span className="flex-1">{c.name}</span>
+                    <Button size="icon" variant="ghost" onClick={() => { setEditingId(c.id); setEditName(c.name); }}>
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button size="icon" variant="ghost" className="text-destructive" onClick={() => del(c.id)}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </>
+                )}
               </div>
             ))
           )}
