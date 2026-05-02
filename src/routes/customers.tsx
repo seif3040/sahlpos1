@@ -107,6 +107,7 @@ function CustomersPage() {
                   <TableCell>{c.phone ?? "-"}</TableCell>
                   <TableCell>{owe > 0 ? <Badge variant="destructive">{formatMoney(owe, currency)}</Badge> : <Badge variant="secondary">سداد</Badge>}</TableCell>
                   <TableCell className="text-left">
+                    <Button size="icon" variant="ghost" title="السجل" onClick={() => openHistory(c)}><History className="h-4 w-4" /></Button>
                     <Button size="icon" variant="ghost" onClick={() => { setEditing(c); setForm({ name: c.name, phone: c.phone ?? "", notes: c.notes ?? "" }); setOpen(true); }}><Pencil className="h-4 w-4" /></Button>
                     <Button size="icon" variant="ghost" className="text-destructive" onClick={() => del(c.id)}><Trash2 className="h-4 w-4" /></Button>
                   </TableCell>
