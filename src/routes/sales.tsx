@@ -562,29 +562,23 @@ function RecentSalesDialog({
   };
 
   const refund = async (id: string) => {
-    if (!confirm("هل تريد استرجاع هذه الفاتورة؟ سيتم إعادة المنتجات للمخزون.")) return;
+    if (!confirm("هل تريد استرجاع كامل الفاتورة؟")) return;
     const { data: items } = await supabase
       .from("sale_items")
-      .select("product_id,quantity")
+      .select("id,quantity,refunded_quantity")
       .eq("sale_id", id);
     for (const it of items ?? []) {
-      if (it.product_id) {
-        const { data: p } = await supabase
-          .from("products")
-          .select("quantity")
-          .eq("id", it.product_id)
-          .maybeSingle();
-        if (p) {
-          await supabase
-            .from("products")
-            .update({ quantity: Number(p.quantity) + Number(it.quantity) })
-            .eq("id", it.product_id);
-        }
+      const remaining = Number(it.quantity) - Number(it.refunded_quantity ?? 0);
+      if (remaining > 0) {
+        const { error } = await supabase.rpc("refund_sale_item", { _item_id: it.id, _qty: remaining });
+        if (error) { toast.error(error.message); return; }
       }
     }
     await supabase.from("sales").update({ is_refunded: true }).eq("id", id);
     toast.success("تم الاسترجاع");
   };
+
+  const [partialFor, setPartialFor] = useState<string | null>(null);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -611,14 +605,86 @@ function RecentSalesDialog({
                 طباعة
               </Button>
               {!s.is_refunded && (
-                <Button size="sm" variant="destructive" onClick={() => refund(s.id)}>
-                  استرجاع
-                </Button>
+                <>
+                  <Button size="sm" variant="outline" onClick={() => setPartialFor(s.id)}>
+                    مرتجع جزئي
+                  </Button>
+                  <Button size="sm" variant="destructive" onClick={() => refund(s.id)}>
+                    استرجاع كامل
+                  </Button>
+                </>
               )}
             </div>
           ))}
         </div>
         <DialogFooter />
+      </DialogContent>
+      <PartialRefundDialog saleId={partialFor} onClose={() => setPartialFor(null)} currency={settings?.currency} />
+    </Dialog>
+  );
+}
+
+interface SaleItemRow { id: string; product_name: string; quantity: number; unit_price: number; refunded_quantity: number }
+
+function PartialRefundDialog({ saleId, onClose, currency }: { saleId: string | null; onClose: () => void; currency?: string }) {
+  const [items, setItems] = useState<SaleItemRow[]>([]);
+  const [qtys, setQtys] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    if (!saleId) { setItems([]); setQtys({}); return; }
+    void (async () => {
+      const { data } = await supabase
+        .from("sale_items")
+        .select("id,product_name,quantity,unit_price,refunded_quantity")
+        .eq("sale_id", saleId);
+      setItems((data ?? []) as SaleItemRow[]);
+      setQtys({});
+    })();
+  }, [saleId]);
+
+  const submit = async () => {
+    const entries = Object.entries(qtys).filter(([, v]) => v > 0);
+    if (entries.length === 0) { toast.error("اختر كمية للاسترجاع"); return; }
+    for (const [id, q] of entries) {
+      const { error } = await supabase.rpc("refund_sale_item", { _item_id: id, _qty: q });
+      if (error) { toast.error(error.message); return; }
+    }
+    toast.success("تم الاسترجاع الجزئي");
+    onClose();
+  };
+
+  return (
+    <Dialog open={!!saleId} onOpenChange={v => !v && onClose()}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader><DialogTitle>مرتجع جزئي</DialogTitle></DialogHeader>
+        <div className="space-y-2 max-h-[50vh] overflow-y-auto">
+          {items.map(it => {
+            const remaining = Number(it.quantity) - Number(it.refunded_quantity);
+            return (
+              <div key={it.id} className="flex items-center gap-2 p-2 border rounded">
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium truncate">{it.product_name}</div>
+                  <div className="text-xs text-muted-foreground">
+                    متبقي للاسترجاع: {remaining} • {formatMoney(it.unit_price, currency)}
+                  </div>
+                </div>
+                <Input
+                  type="number"
+                  min={0}
+                  max={remaining}
+                  value={qtys[it.id] ?? 0}
+                  onChange={e => setQtys(p => ({ ...p, [it.id]: Math.min(remaining, Math.max(0, Number(e.target.value) || 0)) }))}
+                  className="w-20"
+                  disabled={remaining <= 0}
+                />
+              </div>
+            );
+          })}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>إلغاء</Button>
+          <Button onClick={submit}>تأكيد الاسترجاع</Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
