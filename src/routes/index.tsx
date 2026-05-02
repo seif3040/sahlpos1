@@ -66,12 +66,14 @@ function Dashboard() {
         supabase.from("settings").select("currency").eq("id", 1).maybeSingle(),
         supabase
           .from("sales")
-          .select("id,total,created_at,sale_items(quantity,unit_price,cost_price,product_name)")
+          .select("id,total,created_at,is_refunded,sale_items(quantity,refunded_quantity,unit_price,cost_price,product_name)")
+          .eq("is_refunded", false)
           .gte("created_at", startISO)
           .lte("created_at", endISO),
         supabase
           .from("sales")
-          .select("created_at,total,sale_items(product_name,quantity)")
+          .select("created_at,total,is_refunded,sale_items(product_name,quantity,refunded_quantity,unit_price))")
+          .eq("is_refunded", false)
           .gte("created_at", new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString()),
         supabase.from("customer_debts").select("remaining").eq("is_settled", false),
         supabase.from("products").select("id").eq("is_low_stock", true),
