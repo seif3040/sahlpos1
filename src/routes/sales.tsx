@@ -76,8 +76,10 @@ function SalesPage() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [discountType, setDiscountType] = useState<"percent" | "fixed">("percent");
   const [discountValue, setDiscountValue] = useState(0);
-  const [paymentMethod, setPaymentMethod] = useState<"cash" | "card" | "deferred">("cash");
+  const [paymentMethod, setPaymentMethod] = useState<"cash" | "card" | "mixed" | "deferred">("cash");
   const [customerId, setCustomerId] = useState<string>("");
+  const [cashReceived, setCashReceived] = useState<number>(0);
+  const [cardPart, setCardPart] = useState<number>(0);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [recentSales, setRecentSales] = useState<RecentSale[]>([]);
 
