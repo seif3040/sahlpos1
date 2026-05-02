@@ -142,6 +142,7 @@ function Dashboard() {
     const ch = supabase
       .channel("dash")
       .on("postgres_changes", { event: "*", schema: "public", table: "sales" }, () => load())
+      .on("postgres_changes", { event: "*", schema: "public", table: "sale_items" }, () => load())
       .on("postgres_changes", { event: "*", schema: "public", table: "products" }, () => load())
       .subscribe();
     return () => {
