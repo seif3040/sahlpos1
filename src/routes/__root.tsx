@@ -82,9 +82,28 @@ function RootShell({ children }: { children: React.ReactNode }) {
 }
 
 function RootComponent() {
+  const [offline, setOffline] = useState(false);
+  useEffect(() => {
+    if ("serviceWorker" in navigator && import.meta.env.PROD) {
+      navigator.serviceWorker.register("/sw.js").catch(() => {});
+    }
+    const update = () => setOffline(!navigator.onLine);
+    update();
+    window.addEventListener("online", update);
+    window.addEventListener("offline", update);
+    return () => {
+      window.removeEventListener("online", update);
+      window.removeEventListener("offline", update);
+    };
+  }, []);
   return (
     <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
       <AuthProvider>
+        {offline && (
+          <div className="fixed top-0 inset-x-0 z-50 bg-amber-500 text-white text-center text-xs py-1 font-medium">
+            وضع عدم الاتصال - بعض الميزات غير متاحة
+          </div>
+        )}
         <Outlet />
         <Toaster richColors position="top-center" dir="rtl" />
       </AuthProvider>
