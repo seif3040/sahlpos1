@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Plus, Trash2, Pencil, MessageCircle } from "lucide-react";
+import { Plus, Trash2, Pencil, MessageCircle, History } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { RequireAuth } from "@/components/require-auth";
