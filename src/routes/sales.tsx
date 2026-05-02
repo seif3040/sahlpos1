@@ -155,6 +155,12 @@ function SalesPage() {
   const taxAmt = (taxableAmt * (settings?.tax_percent ?? 0)) / 100;
   const total = taxableAmt + taxAmt;
 
+  const cashPart = paymentMethod === "mixed" ? Math.max(0, total - cardPart) : paymentMethod === "cash" ? total : 0;
+  const effectiveCardPart = paymentMethod === "mixed" ? cardPart : paymentMethod === "card" ? total : 0;
+  const changeAmount = paymentMethod === "cash" || paymentMethod === "mixed"
+    ? Math.max(0, cashReceived - cashPart)
+    : 0;
+
   const checkout = async () => {
     if (cart.length === 0) {
       toast.error("السلة فارغة");
@@ -162,6 +168,14 @@ function SalesPage() {
     }
     if (paymentMethod === "deferred" && !customerId) {
       toast.error("اختر العميل للبيع الآجل");
+      return;
+    }
+    if ((paymentMethod === "cash" || paymentMethod === "mixed") && cashReceived < cashPart) {
+      toast.error("المبلغ المستلم أقل من المطلوب");
+      return;
+    }
+    if (paymentMethod === "mixed" && (cardPart <= 0 || cardPart >= total)) {
+      toast.error("في الدفع المختلط يجب تحديد جزء بالبطاقة بين 0 والمجموع");
       return;
     }
 
@@ -175,6 +189,10 @@ function SalesPage() {
         tax: taxAmt,
         total,
         payment_method: paymentMethod,
+        cash_received: cashReceived,
+        change_amount: changeAmount,
+        cash_part: cashPart,
+        card_part: effectiveCardPart,
       })
       .select("id,invoice_number,created_at")
       .single();
@@ -194,7 +212,9 @@ function SalesPage() {
     }));
     const { error: itemsErr } = await supabase.from("sale_items").insert(itemsPayload);
     if (itemsErr) {
-      toast.error("فشل حفظ المنتجات");
+      // rollback the sale
+      await supabase.from("sales").delete().eq("id", sale.id);
+      toast.error(itemsErr.message || "فشل حفظ المنتجات - تم التراجع");
       return;
     }
 
@@ -204,7 +224,7 @@ function SalesPage() {
         .insert({ customer_id: customerId, sale_id: sale.id, amount: total });
     }
 
-    toast.success(`تم الحفظ - فاتورة #${sale.invoice_number}`);
+    toast.success(`تم الحفظ - فاتورة #${sale.invoice_number}${changeAmount > 0 ? ` - الباقي: ${changeAmount.toFixed(2)}` : ""}`);
 
     // Print invoice
     if (settings) {
@@ -226,6 +246,10 @@ function SalesPage() {
           discount: discountAmt,
           tax: taxAmt,
           total,
+          cash_received: cashReceived,
+          change_amount: changeAmount,
+          cash_part: cashPart,
+          card_part: effectiveCardPart,
         },
         settings,
       );
@@ -235,6 +259,8 @@ function SalesPage() {
     setDiscountValue(0);
     setCustomerId("");
     setPaymentMethod("cash");
+    setCashReceived(0);
+    setCardPart(0);
     void load();
   };
 
