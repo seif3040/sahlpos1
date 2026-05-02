@@ -102,6 +102,18 @@ export function ThermalReceipt({
           <div><span>الضريبة</span><strong>{fmt(invoice.tax, currency)}</strong></div>
         ) : null}
         <div className="tr-grand"><span>المجموع</span><strong>{fmt(invoice.total, currency)}</strong></div>
+        {invoice.payment_method === "mixed" && invoice.cash_part != null && invoice.card_part != null ? (
+          <>
+            <div><span>نقدي</span><strong>{fmt(invoice.cash_part, currency)}</strong></div>
+            <div><span>بطاقة</span><strong>{fmt(invoice.card_part, currency)}</strong></div>
+          </>
+        ) : null}
+        {invoice.cash_received && invoice.cash_received > 0 ? (
+          <div><span>المستلم</span><strong>{fmt(invoice.cash_received, currency)}</strong></div>
+        ) : null}
+        {invoice.change_amount && invoice.change_amount > 0 ? (
+          <div className="tr-grand"><span>الباقي</span><strong>{fmt(invoice.change_amount, currency)}</strong></div>
+        ) : null}
       </div>
 
       <div className="tr-divider" />
