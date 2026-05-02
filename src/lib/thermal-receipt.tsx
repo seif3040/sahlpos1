@@ -28,10 +28,14 @@ export interface ReceiptData {
   discount: number;
   tax: number;
   total: number;
+  cash_received?: number;
+  change_amount?: number;
+  cash_part?: number;
+  card_part?: number;
 }
 
 const payText = (m: string) =>
-  m === "cash" ? "نقدي" : m === "card" ? "بطاقة" : m === "deferred" ? "آجل" : m;
+  m === "cash" ? "نقدي" : m === "card" ? "بطاقة" : m === "mixed" ? "مختلط" : m === "deferred" ? "آجل" : m;
 
 const fmt = (n: number, c: string) => `${Number(n).toFixed(2)} ${c}`;
 
