@@ -602,8 +602,11 @@ function RecentSalesDialog({
               <div className="font-bold text-primary">
                 {formatMoney(Number(s.total), settings?.currency)}
               </div>
-              <Button size="sm" variant="outline" onClick={() => reprint(s.id)}>
-                طباعة
+              <Button size="sm" variant="outline" onClick={() => reprint(s.id, "thermal")}>
+                طباعة 80mm
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => reprint(s.id, "a4")}>
+                طباعة A4
               </Button>
               {!s.is_refunded && (
                 <>
