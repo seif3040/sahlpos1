@@ -536,7 +536,7 @@ function RecentSalesDialog({
   sales: RecentSale[];
   settings: SettingsRow | null;
 }) {
-  const reprint = async (id: string) => {
+  const reprint = async (id: string, format: "thermal" | "a4" = "thermal") => {
     if (!settings) return;
     const { data: sale } = await supabase
       .from("sales")
@@ -558,6 +558,7 @@ function RecentSalesDialog({
         total: Number(sale.total),
       },
       settings,
+      format,
     );
   };
 
@@ -601,8 +602,11 @@ function RecentSalesDialog({
               <div className="font-bold text-primary">
                 {formatMoney(Number(s.total), settings?.currency)}
               </div>
-              <Button size="sm" variant="outline" onClick={() => reprint(s.id)}>
-                طباعة
+              <Button size="sm" variant="outline" onClick={() => reprint(s.id, "thermal")}>
+                طباعة 80mm
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => reprint(s.id, "a4")}>
+                طباعة A4
               </Button>
               {!s.is_refunded && (
                 <>

@@ -66,12 +66,14 @@ function Dashboard() {
         supabase.from("settings").select("currency").eq("id", 1).maybeSingle(),
         supabase
           .from("sales")
-          .select("id,total,created_at,sale_items(quantity,unit_price,cost_price,product_name)")
+          .select("id,total,created_at,is_refunded,sale_items(quantity,refunded_quantity,unit_price,cost_price,product_name)")
+          .eq("is_refunded", false)
           .gte("created_at", startISO)
           .lte("created_at", endISO),
         supabase
           .from("sales")
-          .select("created_at,total,sale_items(product_name,quantity)")
+          .select("created_at,total,is_refunded,sale_items(product_name,quantity,refunded_quantity,unit_price)")
+          .eq("is_refunded", false)
           .gte("created_at", new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString()),
         supabase.from("customer_debts").select("remaining").eq("is_settled", false),
         supabase.from("products").select("id").eq("is_low_stock", true),
@@ -82,10 +84,14 @@ function Dashboard() {
     let sumSales = 0;
     let sumProfit = 0;
     for (const s of salesToday ?? []) {
-      sumSales += Number(s.total);
-      for (const it of (s as { sale_items?: { quantity: number; unit_price: number; cost_price: number }[] }).sale_items ?? []) {
-        sumProfit += (Number(it.unit_price) - Number(it.cost_price)) * Number(it.quantity);
+      let saleNet = 0;
+      for (const it of (s as { sale_items?: { quantity: number; refunded_quantity?: number; unit_price: number; cost_price: number }[] }).sale_items ?? []) {
+        const eff = Number(it.quantity) - Number(it.refunded_quantity ?? 0);
+        if (eff <= 0) continue;
+        saleNet += Number(it.unit_price) * eff;
+        sumProfit += (Number(it.unit_price) - Number(it.cost_price)) * eff;
       }
+      sumSales += saleNet;
     }
     const debtsSum = (debts ?? []).reduce((a, d) => a + Number(d.remaining), 0);
 
@@ -108,15 +114,21 @@ function Dashboard() {
     for (const s of items7 ?? []) {
       const d = new Date(s.created_at);
       const key = d.toLocaleDateString("ar-EG", { weekday: "short" });
-      dayMap.set(key, (dayMap.get(key) ?? 0) + Number(s.total));
+      let net = 0;
+      for (const it of (s as { sale_items?: { product_name: string; quantity: number; refunded_quantity?: number; unit_price: number }[] }).sale_items ?? []) {
+        const eff = Number(it.quantity) - Number(it.refunded_quantity ?? 0);
+        if (eff > 0) net += Number(it.unit_price) * eff;
+      }
+      dayMap.set(key, (dayMap.get(key) ?? 0) + net);
     }
     setSalesByDay(Array.from(dayMap, ([day, total]) => ({ day, total })));
 
-    // top products
+    // top products (net of refunds)
     const prodMap = new Map<string, number>();
     for (const s of items7 ?? []) {
-      for (const it of (s as { sale_items?: { product_name: string; quantity: number }[] }).sale_items ?? []) {
-        prodMap.set(it.product_name, (prodMap.get(it.product_name) ?? 0) + Number(it.quantity));
+      for (const it of (s as { sale_items?: { product_name: string; quantity: number; refunded_quantity?: number }[] }).sale_items ?? []) {
+        const eff = Number(it.quantity) - Number(it.refunded_quantity ?? 0);
+        if (eff > 0) prodMap.set(it.product_name, (prodMap.get(it.product_name) ?? 0) + eff);
       }
     }
     const top = Array.from(prodMap, ([name, qty]) => ({ name, qty }))
@@ -130,6 +142,7 @@ function Dashboard() {
     const ch = supabase
       .channel("dash")
       .on("postgres_changes", { event: "*", schema: "public", table: "sales" }, () => load())
+      .on("postgres_changes", { event: "*", schema: "public", table: "sale_items" }, () => load())
       .on("postgres_changes", { event: "*", schema: "public", table: "products" }, () => load())
       .subscribe();
     return () => {
