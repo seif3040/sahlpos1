@@ -20,7 +20,7 @@ export const Route = createFileRoute("/reports")({
   component: () => (<RequireAuth level={2}><ReportsPage /></RequireAuth>),
 });
 
-interface SaleRow { id: string; invoice_number: number; total: number; created_at: string; payment_method: string }
+interface SaleRow { id: string; invoice_number: number; total: number; created_at: string; payment_method: string; is_refunded: boolean; cash_part: number; card_part: number; refund_total?: number }
 interface ExpenseRow { category: string; amount: number; created_at: string }
 interface ProductRow { id: string; name: string; quantity: number; purchase_price: number; selling_price: number; barcode?: string | null; min_quantity?: number; category_id?: string | null }
 
@@ -51,28 +51,35 @@ function ReportsPage() {
     const startISO = new Date(from).toISOString();
     const endISO = new Date(to + "T23:59:59").toISOString();
     const [{ data: s }, { data: e }, { data: p }, { data: si }, { data: st }, { data: d }] = await Promise.all([
-      supabase.from("sales").select("id,invoice_number,total,created_at,payment_method").gte("created_at", startISO).lte("created_at", endISO).order("created_at", { ascending: false }),
+      supabase.from("sales").select("id,invoice_number,total,created_at,payment_method,is_refunded,cash_part,card_part").gte("created_at", startISO).lte("created_at", endISO).order("created_at", { ascending: false }),
       supabase.from("expenses").select("category,amount,created_at").gte("created_at", startISO).lte("created_at", endISO),
       supabase.from("products").select("id,name,quantity,purchase_price,selling_price,barcode,min_quantity,category_id"),
-      supabase.from("sale_items").select("product_name,quantity,unit_price,cost_price,sales!inner(created_at)").gte("sales.created_at", startISO).lte("sales.created_at", endISO),
+      supabase.from("sale_items").select("sale_id,product_name,quantity,unit_price,cost_price,refunded_quantity,sales!inner(created_at)").gte("sales.created_at", startISO).lte("sales.created_at", endISO),
       supabase.from("settings").select("currency").eq("id", 1).maybeSingle(),
       supabase.from("customer_debts").select("remaining").eq("is_settled", false),
     ]);
-    setSales((s ?? []) as SaleRow[]);
+
+    // compute refund total per sale
+    const refundMap = new Map<string, number>();
+    let pr = 0;
+    const prodMap = new Map<string, { qty: number; revenue: number }>();
+    for (const it of (si ?? []) as { sale_id: string; product_name: string; quantity: number; unit_price: number; cost_price: number; refunded_quantity: number }[]) {
+      const netQty = Number(it.quantity) - Number(it.refunded_quantity ?? 0);
+      pr += (Number(it.unit_price) - Number(it.cost_price)) * netQty;
+      const cur = prodMap.get(it.product_name) ?? { qty: 0, revenue: 0 };
+      cur.qty += netQty;
+      cur.revenue += Number(it.unit_price) * netQty;
+      prodMap.set(it.product_name, cur);
+      if (it.refunded_quantity > 0) {
+        refundMap.set(it.sale_id, (refundMap.get(it.sale_id) ?? 0) + Number(it.refunded_quantity) * Number(it.unit_price));
+      }
+    }
+    const salesEnriched = (s ?? []).map((row) => ({ ...row, refund_total: refundMap.get(row.id) ?? 0 })) as SaleRow[];
+    setSales(salesEnriched);
     setExpenses((e ?? []) as ExpenseRow[]);
     setProducts((p ?? []) as ProductRow[]);
     setDebts((d ?? []) as { remaining: number }[]);
     if (st?.currency) setCurrency(st.currency);
-
-    let pr = 0;
-    const prodMap = new Map<string, { qty: number; revenue: number }>();
-    for (const it of (si ?? []) as { product_name: string; quantity: number; unit_price: number; cost_price: number }[]) {
-      pr += (Number(it.unit_price) - Number(it.cost_price)) * Number(it.quantity);
-      const cur = prodMap.get(it.product_name) ?? { qty: 0, revenue: 0 };
-      cur.qty += Number(it.quantity);
-      cur.revenue += Number(it.unit_price) * Number(it.quantity);
-      prodMap.set(it.product_name, cur);
-    }
     setProfit(pr);
     setTopProducts(Array.from(prodMap, ([name, v]) => ({ name, ...v })).sort((a, b) => b.qty - a.qty).slice(0, 10));
   };
