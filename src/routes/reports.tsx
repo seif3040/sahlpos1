@@ -85,17 +85,42 @@ function ReportsPage() {
   };
   useEffect(() => { void load(); }, [from, to]);
 
-  const totalSales = sales.reduce((a, s) => a + Number(s.total), 0);
+  // gross totals (excluding fully refunded), then net = gross - refunds
+  const totalSales = sales.filter(s => !s.is_refunded).reduce((a, s) => a + Number(s.total), 0);
+  const totalRefunds = sales.reduce((a, s) => a + Number(s.refund_total ?? 0) + (s.is_refunded ? Number(s.total) : 0), 0);
+  const netSales = totalSales - sales.filter(s => !s.is_refunded).reduce((a, s) => a + Number(s.refund_total ?? 0), 0);
   const totalExpenses = expenses.reduce((a, e) => a + Number(e.amount), 0);
   const inventoryValue = products.reduce((a, p) => a + Number(p.quantity) * Number(p.purchase_price), 0);
   const outstandingDebts = debts.reduce((a, d) => a + Number(d.remaining), 0);
 
   const dayMap = new Map<string, number>();
   for (const s of sales) {
+    if (s.is_refunded) continue;
     const k = new Date(s.created_at).toLocaleDateString("ar-EG");
-    dayMap.set(k, (dayMap.get(k) ?? 0) + Number(s.total));
+    const net = Number(s.total) - Number(s.refund_total ?? 0);
+    dayMap.set(k, (dayMap.get(k) ?? 0) + net);
   }
   const chartData = Array.from(dayMap, ([day, total]) => ({ day, total })).reverse();
+
+  // daily breakdown by payment method
+  type PMRow = { day: string; cash: number; card: number; mixed: number; deferred: number; gross: number; refunds: number; net: number };
+  const pmDayMap = new Map<string, PMRow>();
+  for (const s of sales) {
+    const k = new Date(s.created_at).toLocaleDateString("ar-EG");
+    const row = pmDayMap.get(k) ?? { day: k, cash: 0, card: 0, mixed: 0, deferred: 0, gross: 0, refunds: 0, net: 0 };
+    const isFull = s.is_refunded;
+    const gross = isFull ? 0 : Number(s.total);
+    const refunds = (isFull ? Number(s.total) : 0) + Number(s.refund_total ?? 0);
+    row.gross += gross;
+    row.refunds += refunds;
+    row.net += gross - Number(s.refund_total ?? 0);
+    if (!isFull) {
+      const m = s.payment_method as keyof PMRow;
+      if (m === "cash" || m === "card" || m === "mixed" || m === "deferred") row[m] += Number(s.total);
+    }
+    pmDayMap.set(k, row);
+  }
+  const pmDaily = Array.from(pmDayMap.values()).sort((a, b) => a.day.localeCompare(b.day));
 
   // -------- AI analysis --------
   const runAi = async () => {
