@@ -295,14 +295,18 @@ function ReportsPage() {
       </CardContent></Card>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <KPI label="إجمالي المبيعات" value={formatMoney(totalSales, currency)} />
-        <KPI label="الربح" value={formatMoney(profit, currency)} />
+        <KPI label="إجمالي المبيعات (إجمالي)" value={formatMoney(totalSales, currency)} />
+        <KPI label="صافي بعد المرتجعات" value={formatMoney(netSales, currency)} />
+        <KPI label="إجمالي المرتجعات" value={formatMoney(totalRefunds, currency)} />
+        <KPI label="الربح الصافي" value={formatMoney(profit, currency)} />
         <KPI label="المصروفات" value={formatMoney(totalExpenses, currency)} />
         <KPI label="قيمة المخزون" value={formatMoney(inventoryValue, currency)} />
+        <KPI label="الديون المستحقة" value={formatMoney(outstandingDebts, currency)} />
+        <KPI label="عدد الفواتير" value={String(sales.length)} />
       </div>
 
       <Card>
-        <CardHeader><CardTitle>المبيعات اليومية</CardTitle></CardHeader>
+        <CardHeader><CardTitle>المبيعات اليومية (الصافي)</CardTitle></CardHeader>
         <CardContent className="h-72">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={chartData}>
@@ -311,6 +315,51 @@ function ReportsPage() {
               <Bar dataKey="total" fill="var(--color-chart-1)" radius={[8, 8, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle>تقرير المبيعات اليومي حسب طريقة الدفع</CardTitle>
+          <Button size="sm" variant="outline" onClick={() => exportToExcel(
+            pmDaily.map(r => ({
+              "اليوم": r.day,
+              "كاش": r.cash, "كارت": r.card, "مختلط": r.mixed, "آجل": r.deferred,
+              "الإجمالي": r.gross, "المرتجعات": r.refunds, "الصافي": r.net,
+            })), "daily-by-payment.xlsx", "daily")}>
+            <Download className="h-4 w-4 ml-2" />تصدير
+          </Button>
+        </CardHeader>
+        <CardContent className="p-0 overflow-x-auto">
+          <Table>
+            <TableHeader><TableRow>
+              <TableHead>اليوم</TableHead>
+              <TableHead>كاش</TableHead>
+              <TableHead>كارت</TableHead>
+              <TableHead>مختلط</TableHead>
+              <TableHead>آجل</TableHead>
+              <TableHead>الإجمالي</TableHead>
+              <TableHead>المرتجعات</TableHead>
+              <TableHead>الصافي</TableHead>
+            </TableRow></TableHeader>
+            <TableBody>
+              {pmDaily.map(r => (
+                <TableRow key={r.day}>
+                  <TableCell>{r.day}</TableCell>
+                  <TableCell>{formatMoney(r.cash, currency)}</TableCell>
+                  <TableCell>{formatMoney(r.card, currency)}</TableCell>
+                  <TableCell>{formatMoney(r.mixed, currency)}</TableCell>
+                  <TableCell>{formatMoney(r.deferred, currency)}</TableCell>
+                  <TableCell>{formatMoney(r.gross, currency)}</TableCell>
+                  <TableCell className="text-destructive">- {formatMoney(r.refunds, currency)}</TableCell>
+                  <TableCell className="font-bold text-primary">{formatMoney(r.net, currency)}</TableCell>
+                </TableRow>
+              ))}
+              {pmDaily.length === 0 && (
+                <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-6">لا توجد بيانات في الفترة المحددة</TableCell></TableRow>
+              )}
+            </TableBody>
+          </Table>
         </CardContent>
       </Card>
 
