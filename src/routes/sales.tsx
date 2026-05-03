@@ -114,9 +114,32 @@ function SalesPage() {
   }, [products, search]);
 
   const handleScan = (code: string) => {
-    const found = products.find((p) => p.barcode === code);
+    const c = code.trim();
+    if (!c) return;
+    const found = products.find((p) => p.barcode === c);
     if (found) addToCart(found);
-    else toast.error("لم يتم العثور على المنتج");
+    else toast.error(`لم يتم العثور على منتج بالباركود: ${c}`);
+  };
+
+  const handleSearchKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    const q = search.trim();
+    if (!q) return;
+    const exact = products.find((p) => p.barcode === q);
+    if (exact) {
+      addToCart(exact);
+      setSearch("");
+      return;
+    }
+    if (filtered.length === 1) {
+      addToCart(filtered[0]);
+      setSearch("");
+      return;
+    }
+    if (filtered.length === 0) {
+      toast.error(`لا يوجد منتج مطابق لـ: ${q}`);
+    }
   };
 
   const addToCart = (p: Product) => {
@@ -179,30 +202,39 @@ function SalesPage() {
       return;
     }
 
-    const { data: sale, error } = await supabase
-      .from("sales")
-      .insert({
-        cashier_id: employee?.id,
-        customer_id: customerId || null,
-        subtotal,
-        discount: discountAmt,
-        tax: taxAmt,
-        total,
-        payment_method: paymentMethod,
-        cash_received: cashReceived,
-        change_amount: changeAmount,
-        cash_part: cashPart,
-        card_part: effectiveCardPart,
-      })
-      .select("id,invoice_number,created_at")
-      .single();
-    if (error || !sale) {
-      toast.error(error?.message || "فشل الحفظ");
+    // Insert sale with retry on unique invoice_number conflict (concurrency safety)
+    let sale: { id: string; invoice_number: number; created_at: string } | null = null;
+    let lastErr: { message: string; code?: string } | null = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const { data, error: insErr } = await supabase
+        .from("sales")
+        .insert({
+          cashier_id: employee?.id,
+          customer_id: customerId || null,
+          subtotal,
+          discount: discountAmt,
+          tax: taxAmt,
+          total,
+          payment_method: paymentMethod,
+          cash_received: cashReceived,
+          change_amount: changeAmount,
+          cash_part: cashPart,
+          card_part: effectiveCardPart,
+        })
+        .select("id,invoice_number,created_at")
+        .single();
+      if (data) { sale = data; break; }
+      lastErr = insErr;
+      if (insErr?.code === "23505") continue; // duplicate invoice_number, retry
+      break;
+    }
+    if (!sale) {
+      toast.error(lastErr?.message || "فشل الحفظ");
       return;
     }
 
     const itemsPayload = cart.map((c) => ({
-      sale_id: sale.id,
+      sale_id: sale!.id,
       product_id: c.product.id,
       product_name: c.product.name,
       quantity: c.qty,
@@ -278,9 +310,11 @@ function SalesPage() {
           <div className="relative flex-1">
             <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="ابحث بالاسم أو الباركود..."
+              placeholder="ابحث بالاسم أو امسح الباركود واضغط Enter..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={handleSearchKey}
+              autoFocus
               className="pr-10"
             />
           </div>
@@ -536,26 +570,67 @@ function RecentSalesDialog({
   sales: RecentSale[];
   settings: SettingsRow | null;
 }) {
-  const reprint = async (id: string, format: "thermal" | "a4" = "thermal") => {
+  const reprint = async (id: string, format: "thermal" | "a4" = "thermal", netOnly = false) => {
     if (!settings) return;
     const { data: sale } = await supabase
       .from("sales")
       .select(
-        "invoice_number,created_at,payment_method,subtotal,discount,tax,total,sale_items(product_name,quantity,unit_price,line_total)",
+        "invoice_number,created_at,payment_method,subtotal,discount,tax,total,sale_items(product_name,quantity,unit_price,line_total,refunded_quantity)",
       )
       .eq("id", id)
       .maybeSingle();
     if (!sale) return;
+    type ItemRaw = { product_name: string; quantity: number; unit_price: number; line_total: number; refunded_quantity?: number };
+    const rawItems = (sale.sale_items ?? []) as ItemRaw[];
+    let items = rawItems.map((it) => ({
+      product_name: it.product_name,
+      quantity: Number(it.quantity),
+      unit_price: Number(it.unit_price),
+      line_total: Number(it.line_total),
+    }));
+    let subtotal = Number(sale.subtotal);
+    let discount = Number(sale.discount);
+    let tax = Number(sale.tax);
+    let total = Number(sale.total);
+
+    if (netOnly) {
+      // keep only items with remaining (not fully refunded), use net qty
+      items = rawItems
+        .map((it) => {
+          const net = Number(it.quantity) - Number(it.refunded_quantity ?? 0);
+          return net > 0
+            ? {
+                product_name: it.product_name,
+                quantity: net,
+                unit_price: Number(it.unit_price),
+                line_total: net * Number(it.unit_price),
+              }
+            : null;
+        })
+        .filter((x): x is NonNullable<typeof x> => !!x);
+      subtotal = items.reduce((a, x) => a + x.line_total, 0);
+      const origSub = Number(sale.subtotal) || 1;
+      const ratio = subtotal / origSub;
+      discount = Number(sale.discount) * ratio;
+      tax = Number(sale.tax) * ratio;
+      total = Math.max(0, subtotal - discount + tax);
+    }
+
+    if (netOnly && items.length === 0) {
+      toast.error("الفاتورة مرتجعة بالكامل - لا يوجد صافي للطباعة");
+      return;
+    }
+
     printThermalReceipt(
       {
         invoice_number: Number(sale.invoice_number),
         created_at: sale.created_at,
         payment_method: sale.payment_method,
-        items: (sale.sale_items ?? []) as { product_name: string; quantity: number; unit_price: number; line_total: number }[],
-        subtotal: Number(sale.subtotal),
-        discount: Number(sale.discount),
-        tax: Number(sale.tax),
-        total: Number(sale.total),
+        items,
+        subtotal,
+        discount,
+        tax,
+        total,
       },
       settings,
       format,
@@ -607,6 +682,9 @@ function RecentSalesDialog({
               </Button>
               <Button size="sm" variant="outline" onClick={() => reprint(s.id, "a4")}>
                 طباعة A4
+              </Button>
+              <Button size="sm" variant="secondary" onClick={() => reprint(s.id, "thermal", true)}>
+                إعادة طباعة (الصافي)
               </Button>
               {!s.is_refunded && (
                 <>

@@ -1,0 +1,1 @@
+ALTER TABLE public.sales ADD CONSTRAINT sales_invoice_number_unique UNIQUE (invoice_number);

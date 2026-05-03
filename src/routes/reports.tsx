@@ -20,7 +20,7 @@ export const Route = createFileRoute("/reports")({
   component: () => (<RequireAuth level={2}><ReportsPage /></RequireAuth>),
 });
 
-interface SaleRow { id: string; invoice_number: number; total: number; created_at: string; payment_method: string }
+interface SaleRow { id: string; invoice_number: number; total: number; created_at: string; payment_method: string; is_refunded: boolean; cash_part: number; card_part: number; refund_total?: number }
 interface ExpenseRow { category: string; amount: number; created_at: string }
 interface ProductRow { id: string; name: string; quantity: number; purchase_price: number; selling_price: number; barcode?: string | null; min_quantity?: number; category_id?: string | null }
 
@@ -51,44 +51,76 @@ function ReportsPage() {
     const startISO = new Date(from).toISOString();
     const endISO = new Date(to + "T23:59:59").toISOString();
     const [{ data: s }, { data: e }, { data: p }, { data: si }, { data: st }, { data: d }] = await Promise.all([
-      supabase.from("sales").select("id,invoice_number,total,created_at,payment_method").gte("created_at", startISO).lte("created_at", endISO).order("created_at", { ascending: false }),
+      supabase.from("sales").select("id,invoice_number,total,created_at,payment_method,is_refunded,cash_part,card_part").gte("created_at", startISO).lte("created_at", endISO).order("created_at", { ascending: false }),
       supabase.from("expenses").select("category,amount,created_at").gte("created_at", startISO).lte("created_at", endISO),
       supabase.from("products").select("id,name,quantity,purchase_price,selling_price,barcode,min_quantity,category_id"),
-      supabase.from("sale_items").select("product_name,quantity,unit_price,cost_price,sales!inner(created_at)").gte("sales.created_at", startISO).lte("sales.created_at", endISO),
+      supabase.from("sale_items").select("sale_id,product_name,quantity,unit_price,cost_price,refunded_quantity,sales!inner(created_at)").gte("sales.created_at", startISO).lte("sales.created_at", endISO),
       supabase.from("settings").select("currency").eq("id", 1).maybeSingle(),
       supabase.from("customer_debts").select("remaining").eq("is_settled", false),
     ]);
-    setSales((s ?? []) as SaleRow[]);
+
+    // compute refund total per sale
+    const refundMap = new Map<string, number>();
+    let pr = 0;
+    const prodMap = new Map<string, { qty: number; revenue: number }>();
+    for (const it of (si ?? []) as { sale_id: string; product_name: string; quantity: number; unit_price: number; cost_price: number; refunded_quantity: number }[]) {
+      const netQty = Number(it.quantity) - Number(it.refunded_quantity ?? 0);
+      pr += (Number(it.unit_price) - Number(it.cost_price)) * netQty;
+      const cur = prodMap.get(it.product_name) ?? { qty: 0, revenue: 0 };
+      cur.qty += netQty;
+      cur.revenue += Number(it.unit_price) * netQty;
+      prodMap.set(it.product_name, cur);
+      if (it.refunded_quantity > 0) {
+        refundMap.set(it.sale_id, (refundMap.get(it.sale_id) ?? 0) + Number(it.refunded_quantity) * Number(it.unit_price));
+      }
+    }
+    const salesEnriched = (s ?? []).map((row) => ({ ...row, refund_total: refundMap.get(row.id) ?? 0 })) as SaleRow[];
+    setSales(salesEnriched);
     setExpenses((e ?? []) as ExpenseRow[]);
     setProducts((p ?? []) as ProductRow[]);
     setDebts((d ?? []) as { remaining: number }[]);
     if (st?.currency) setCurrency(st.currency);
-
-    let pr = 0;
-    const prodMap = new Map<string, { qty: number; revenue: number }>();
-    for (const it of (si ?? []) as { product_name: string; quantity: number; unit_price: number; cost_price: number }[]) {
-      pr += (Number(it.unit_price) - Number(it.cost_price)) * Number(it.quantity);
-      const cur = prodMap.get(it.product_name) ?? { qty: 0, revenue: 0 };
-      cur.qty += Number(it.quantity);
-      cur.revenue += Number(it.unit_price) * Number(it.quantity);
-      prodMap.set(it.product_name, cur);
-    }
     setProfit(pr);
     setTopProducts(Array.from(prodMap, ([name, v]) => ({ name, ...v })).sort((a, b) => b.qty - a.qty).slice(0, 10));
   };
   useEffect(() => { void load(); }, [from, to]);
 
-  const totalSales = sales.reduce((a, s) => a + Number(s.total), 0);
+  // gross totals (excluding fully refunded), then net = gross - refunds
+  const totalSales = sales.filter(s => !s.is_refunded).reduce((a, s) => a + Number(s.total), 0);
+  const totalRefunds = sales.reduce((a, s) => a + Number(s.refund_total ?? 0) + (s.is_refunded ? Number(s.total) : 0), 0);
+  const netSales = totalSales - sales.filter(s => !s.is_refunded).reduce((a, s) => a + Number(s.refund_total ?? 0), 0);
   const totalExpenses = expenses.reduce((a, e) => a + Number(e.amount), 0);
   const inventoryValue = products.reduce((a, p) => a + Number(p.quantity) * Number(p.purchase_price), 0);
   const outstandingDebts = debts.reduce((a, d) => a + Number(d.remaining), 0);
 
   const dayMap = new Map<string, number>();
   for (const s of sales) {
+    if (s.is_refunded) continue;
     const k = new Date(s.created_at).toLocaleDateString("ar-EG");
-    dayMap.set(k, (dayMap.get(k) ?? 0) + Number(s.total));
+    const net = Number(s.total) - Number(s.refund_total ?? 0);
+    dayMap.set(k, (dayMap.get(k) ?? 0) + net);
   }
   const chartData = Array.from(dayMap, ([day, total]) => ({ day, total })).reverse();
+
+  // daily breakdown by payment method
+  type PMRow = { day: string; cash: number; card: number; mixed: number; deferred: number; gross: number; refunds: number; net: number };
+  const pmDayMap = new Map<string, PMRow>();
+  for (const s of sales) {
+    const k = new Date(s.created_at).toLocaleDateString("ar-EG");
+    const row = pmDayMap.get(k) ?? { day: k, cash: 0, card: 0, mixed: 0, deferred: 0, gross: 0, refunds: 0, net: 0 };
+    const isFull = s.is_refunded;
+    const gross = isFull ? 0 : Number(s.total);
+    const refunds = (isFull ? Number(s.total) : 0) + Number(s.refund_total ?? 0);
+    row.gross += gross;
+    row.refunds += refunds;
+    row.net += gross - Number(s.refund_total ?? 0);
+    if (!isFull) {
+      const m = s.payment_method as keyof PMRow;
+      if (m === "cash" || m === "card" || m === "mixed" || m === "deferred") row[m] += Number(s.total);
+    }
+    pmDayMap.set(k, row);
+  }
+  const pmDaily = Array.from(pmDayMap.values()).sort((a, b) => a.day.localeCompare(b.day));
 
   // -------- AI analysis --------
   const runAi = async () => {
@@ -263,14 +295,18 @@ function ReportsPage() {
       </CardContent></Card>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <KPI label="إجمالي المبيعات" value={formatMoney(totalSales, currency)} />
-        <KPI label="الربح" value={formatMoney(profit, currency)} />
+        <KPI label="إجمالي المبيعات (إجمالي)" value={formatMoney(totalSales, currency)} />
+        <KPI label="صافي بعد المرتجعات" value={formatMoney(netSales, currency)} />
+        <KPI label="إجمالي المرتجعات" value={formatMoney(totalRefunds, currency)} />
+        <KPI label="الربح الصافي" value={formatMoney(profit, currency)} />
         <KPI label="المصروفات" value={formatMoney(totalExpenses, currency)} />
         <KPI label="قيمة المخزون" value={formatMoney(inventoryValue, currency)} />
+        <KPI label="الديون المستحقة" value={formatMoney(outstandingDebts, currency)} />
+        <KPI label="عدد الفواتير" value={String(sales.length)} />
       </div>
 
       <Card>
-        <CardHeader><CardTitle>المبيعات اليومية</CardTitle></CardHeader>
+        <CardHeader><CardTitle>المبيعات اليومية (الصافي)</CardTitle></CardHeader>
         <CardContent className="h-72">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={chartData}>
@@ -279,6 +315,51 @@ function ReportsPage() {
               <Bar dataKey="total" fill="var(--color-chart-1)" radius={[8, 8, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle>تقرير المبيعات اليومي حسب طريقة الدفع</CardTitle>
+          <Button size="sm" variant="outline" onClick={() => exportToExcel(
+            pmDaily.map(r => ({
+              "اليوم": r.day,
+              "كاش": r.cash, "كارت": r.card, "مختلط": r.mixed, "آجل": r.deferred,
+              "الإجمالي": r.gross, "المرتجعات": r.refunds, "الصافي": r.net,
+            })), "daily-by-payment.xlsx", "daily")}>
+            <Download className="h-4 w-4 ml-2" />تصدير
+          </Button>
+        </CardHeader>
+        <CardContent className="p-0 overflow-x-auto">
+          <Table>
+            <TableHeader><TableRow>
+              <TableHead>اليوم</TableHead>
+              <TableHead>كاش</TableHead>
+              <TableHead>كارت</TableHead>
+              <TableHead>مختلط</TableHead>
+              <TableHead>آجل</TableHead>
+              <TableHead>الإجمالي</TableHead>
+              <TableHead>المرتجعات</TableHead>
+              <TableHead>الصافي</TableHead>
+            </TableRow></TableHeader>
+            <TableBody>
+              {pmDaily.map(r => (
+                <TableRow key={r.day}>
+                  <TableCell>{r.day}</TableCell>
+                  <TableCell>{formatMoney(r.cash, currency)}</TableCell>
+                  <TableCell>{formatMoney(r.card, currency)}</TableCell>
+                  <TableCell>{formatMoney(r.mixed, currency)}</TableCell>
+                  <TableCell>{formatMoney(r.deferred, currency)}</TableCell>
+                  <TableCell>{formatMoney(r.gross, currency)}</TableCell>
+                  <TableCell className="text-destructive">- {formatMoney(r.refunds, currency)}</TableCell>
+                  <TableCell className="font-bold text-primary">{formatMoney(r.net, currency)}</TableCell>
+                </TableRow>
+              ))}
+              {pmDaily.length === 0 && (
+                <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-6">لا توجد بيانات في الفترة المحددة</TableCell></TableRow>
+              )}
+            </TableBody>
+          </Table>
         </CardContent>
       </Card>
 
