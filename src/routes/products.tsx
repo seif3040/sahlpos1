@@ -620,8 +620,15 @@ function printBarcode(code: string, name: string) {
   const dataUrl = canvas.toDataURL("image/png");
   const w = window.open("", "_blank", "width=400,height=300");
   if (!w) return;
-  w.document.write(
-    `<html dir="rtl"><body style="text-align:center;font-family:sans-serif"><h3>${name}</h3><img src="${dataUrl}"/><script>window.print();</script></body></html>`,
-  );
-  w.document.close();
+  const doc = w.document;
+  doc.open();
+  doc.write(`<!doctype html><html dir="rtl"><head><meta charset="utf-8"><title>Barcode</title></head><body style="text-align:center;font-family:sans-serif"></body></html>`);
+  doc.close();
+  const h3 = doc.createElement("h3");
+  h3.textContent = name;
+  const img = doc.createElement("img");
+  img.src = dataUrl;
+  doc.body.appendChild(h3);
+  doc.body.appendChild(img);
+  img.onload = () => w.print();
 }
