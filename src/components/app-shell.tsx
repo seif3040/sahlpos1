@@ -8,6 +8,7 @@ import {
   Building2,
   Wallet,
   Receipt,
+  Undo2,
   BarChart3,
   Settings,
   LogOut,
