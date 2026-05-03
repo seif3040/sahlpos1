@@ -49,10 +49,10 @@ export function AppShell({ children }: { children: ReactNode }) {
       <div className="p-4 border-b border-sidebar-border">
         <div className="flex items-center gap-2">
           <div className="h-9 w-9 rounded-lg bg-primary text-primary-foreground flex items-center justify-center font-bold">
-            ن
+            S
           </div>
           <div>
-            <div className="font-bold text-sm">نقاط البيع</div>
+            <div className="font-bold text-sm">sahl pos</div>
             <div className="text-xs text-muted-foreground">{employee?.name}</div>
           </div>
         </div>
@@ -132,7 +132,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <Button variant="ghost" size="icon" onClick={() => setMobileOpen(true)}>
             <Menu className="h-5 w-5" />
           </Button>
-          <div className="font-bold">نظام نقاط البيع</div>
+          <div className="font-bold">sahl pos</div>
         </header>
         <main className="flex-1 overflow-auto p-4 md:p-6">{children}</main>
       </div>

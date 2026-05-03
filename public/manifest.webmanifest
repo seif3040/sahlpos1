@@ -1,7 +1,7 @@
 {
-  "name": "نظام نقاط البيع",
-  "short_name": "POS",
-  "description": "نظام نقاط البيع - إدارة المبيعات والمخزون",
+  "name": "sahl pos",
+  "short_name": "sahl pos",
+  "description": "sahl pos - إدارة المبيعات والمخزون",
   "start_url": "/",
   "display": "standalone",
   "orientation": "any",
