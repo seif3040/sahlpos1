@@ -114,9 +114,32 @@ function SalesPage() {
   }, [products, search]);
 
   const handleScan = (code: string) => {
-    const found = products.find((p) => p.barcode === code);
+    const c = code.trim();
+    if (!c) return;
+    const found = products.find((p) => p.barcode === c);
     if (found) addToCart(found);
-    else toast.error("لم يتم العثور على المنتج");
+    else toast.error(`لم يتم العثور على منتج بالباركود: ${c}`);
+  };
+
+  const handleSearchKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    const q = search.trim();
+    if (!q) return;
+    const exact = products.find((p) => p.barcode === q);
+    if (exact) {
+      addToCart(exact);
+      setSearch("");
+      return;
+    }
+    if (filtered.length === 1) {
+      addToCart(filtered[0]);
+      setSearch("");
+      return;
+    }
+    if (filtered.length === 0) {
+      toast.error(`لا يوجد منتج مطابق لـ: ${q}`);
+    }
   };
 
   const addToCart = (p: Product) => {
@@ -278,9 +301,11 @@ function SalesPage() {
           <div className="relative flex-1">
             <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="ابحث بالاسم أو الباركود..."
+              placeholder="ابحث بالاسم أو امسح الباركود واضغط Enter..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={handleSearchKey}
+              autoFocus
               className="pr-10"
             />
           </div>
