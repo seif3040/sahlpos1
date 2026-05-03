@@ -683,6 +683,9 @@ function RecentSalesDialog({
               <Button size="sm" variant="outline" onClick={() => reprint(s.id, "a4")}>
                 طباعة A4
               </Button>
+              <Button size="sm" variant="secondary" onClick={() => reprint(s.id, "thermal", true)}>
+                إعادة طباعة (الصافي)
+              </Button>
               {!s.is_refunded && (
                 <>
                   <Button size="sm" variant="outline" onClick={() => setPartialFor(s.id)}>
