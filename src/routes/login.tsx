@@ -126,7 +126,7 @@ function LoginPage() {
           </div>
         </div>
 
-        {bootstrapped && (
+        {showDefaultHint && (
           <p className="text-center text-xs text-muted-foreground mt-4">
             الرقم السري الافتراضي للمالك: <span className="font-mono font-bold">1234</span>
             <br />
