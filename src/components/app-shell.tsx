@@ -8,6 +8,7 @@ import {
   Building2,
   Wallet,
   Receipt,
+  Undo2,
   BarChart3,
   Settings,
   LogOut,
@@ -31,6 +32,7 @@ const NAV = [
   { to: "/suppliers", label: "الموردين", icon: Building2, level: 2 as const },
   { to: "/cash-register", label: "الصندوق", icon: Wallet, level: 1 as const },
   { to: "/expenses", label: "المصروفات", icon: Receipt, level: 1 as const },
+  { to: "/refunds", label: "سجل المرتجعات", icon: Undo2, level: 1 as const },
   { to: "/reports", label: "التقارير", icon: BarChart3, level: 2 as const },
   { to: "/settings", label: "الإعدادات", icon: Settings, level: 3 as const },
 ];
