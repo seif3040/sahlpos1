@@ -17,12 +17,12 @@ function LoginPage() {
   const { employee, refresh } = useAuth();
   const [pin, setPin] = useState("");
   const [busy, setBusy] = useState(false);
-  const [bootstrapped, setBootstrapped] = useState(false);
+  const [showDefaultHint, setShowDefaultHint] = useState(false);
 
   useEffect(() => {
     void ensureDefaultOwner({ data: undefined } as never)
-      .then(() => setBootstrapped(true))
-      .catch(() => setBootstrapped(true));
+      .then((r) => { if (r?.created) setShowDefaultHint(true); })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
