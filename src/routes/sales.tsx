@@ -570,26 +570,67 @@ function RecentSalesDialog({
   sales: RecentSale[];
   settings: SettingsRow | null;
 }) {
-  const reprint = async (id: string, format: "thermal" | "a4" = "thermal") => {
+  const reprint = async (id: string, format: "thermal" | "a4" = "thermal", netOnly = false) => {
     if (!settings) return;
     const { data: sale } = await supabase
       .from("sales")
       .select(
-        "invoice_number,created_at,payment_method,subtotal,discount,tax,total,sale_items(product_name,quantity,unit_price,line_total)",
+        "invoice_number,created_at,payment_method,subtotal,discount,tax,total,sale_items(product_name,quantity,unit_price,line_total,refunded_quantity)",
       )
       .eq("id", id)
       .maybeSingle();
     if (!sale) return;
+    type ItemRaw = { product_name: string; quantity: number; unit_price: number; line_total: number; refunded_quantity?: number };
+    const rawItems = (sale.sale_items ?? []) as ItemRaw[];
+    let items = rawItems.map((it) => ({
+      product_name: it.product_name,
+      quantity: Number(it.quantity),
+      unit_price: Number(it.unit_price),
+      line_total: Number(it.line_total),
+    }));
+    let subtotal = Number(sale.subtotal);
+    let discount = Number(sale.discount);
+    let tax = Number(sale.tax);
+    let total = Number(sale.total);
+
+    if (netOnly) {
+      // keep only items with remaining (not fully refunded), use net qty
+      items = rawItems
+        .map((it) => {
+          const net = Number(it.quantity) - Number(it.refunded_quantity ?? 0);
+          return net > 0
+            ? {
+                product_name: it.product_name,
+                quantity: net,
+                unit_price: Number(it.unit_price),
+                line_total: net * Number(it.unit_price),
+              }
+            : null;
+        })
+        .filter((x): x is NonNullable<typeof x> => !!x);
+      subtotal = items.reduce((a, x) => a + x.line_total, 0);
+      const origSub = Number(sale.subtotal) || 1;
+      const ratio = subtotal / origSub;
+      discount = Number(sale.discount) * ratio;
+      tax = Number(sale.tax) * ratio;
+      total = Math.max(0, subtotal - discount + tax);
+    }
+
+    if (netOnly && items.length === 0) {
+      toast.error("الفاتورة مرتجعة بالكامل - لا يوجد صافي للطباعة");
+      return;
+    }
+
     printThermalReceipt(
       {
         invoice_number: Number(sale.invoice_number),
         created_at: sale.created_at,
         payment_method: sale.payment_method,
-        items: (sale.sale_items ?? []) as { product_name: string; quantity: number; unit_price: number; line_total: number }[],
-        subtotal: Number(sale.subtotal),
-        discount: Number(sale.discount),
-        tax: Number(sale.tax),
-        total: Number(sale.total),
+        items,
+        subtotal,
+        discount,
+        tax,
+        total,
       },
       settings,
       format,
