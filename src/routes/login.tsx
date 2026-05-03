@@ -75,7 +75,7 @@ function LoginPage() {
           <div className="inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg mb-4">
             <ShoppingBag className="h-8 w-8" />
           </div>
-          <h1 className="text-2xl font-bold">نظام نقاط البيع</h1>
+          <h1 className="text-2xl font-bold">sahl pos</h1>
           <p className="text-sm text-muted-foreground mt-1">أدخل الرقم السري للدخول</p>
         </div>
 
