@@ -1,15 +1,28 @@
 import { createServerFn } from "@tanstack/react-start";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+
+/**
+ * Verify the calling user is an owner using the service-role admin client.
+ * The auth middleware has already validated the bearer token and set userId.
+ */
+async function assertOwner(userId: string) {
+  const { data, error } = await supabaseAdmin
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", userId)
+    .eq("role", "owner")
+    .maybeSingle();
+  if (error) throw new Response("Forbidden", { status: 403 });
+  if (!data) throw new Response("Forbidden: owner role required", { status: 403 });
+}
 
 /**
  * Ensures a default owner employee with PIN 1234 exists.
- * - Creates an auth user pin-<employeeId>@shop.local with password = PIN.
- * - Creates the employee row and the user_roles row.
  * Idempotent: safe to call on every login screen mount.
- * Returns { email, pin } that can also be used to look up by PIN.
+ * INTENTIONALLY public — required for first-time bootstrap before any auth exists.
  */
 export const ensureDefaultOwner = createServerFn({ method: "POST" }).handler(async () => {
-  // already an owner? do nothing.
   const { data: existingOwners } = await supabaseAdmin
     .from("employees")
     .select("id,user_id,pin")
@@ -21,7 +34,6 @@ export const ensureDefaultOwner = createServerFn({ method: "POST" }).handler(asy
     return { ok: true, created: false };
   }
 
-  // Create the employee row first to obtain a stable id for the synthetic email.
   const { data: emp, error: empErr } = await supabaseAdmin
     .from("employees")
     .insert({ name: "صاحب المحل", pin: "1234", role: "owner", active: true })
@@ -32,7 +44,6 @@ export const ensureDefaultOwner = createServerFn({ method: "POST" }).handler(asy
   const email = `pin-${emp.id}@shop.local`;
   const password = "1234";
 
-  // Create the auth user.
   const { data: authUser, error: authErr } = await supabaseAdmin.auth.admin.createUser({
     email,
     password,
@@ -40,7 +51,6 @@ export const ensureDefaultOwner = createServerFn({ method: "POST" }).handler(asy
   });
   if (authErr || !authUser?.user) throw new Error(authErr?.message || "failed to create auth user");
 
-  // Link employee -> user_id and create role row.
   await supabaseAdmin.from("employees").update({ user_id: authUser.user.id }).eq("id", emp.id);
   await supabaseAdmin.from("user_roles").insert({ user_id: authUser.user.id, role: "owner" });
 
@@ -48,8 +58,9 @@ export const ensureDefaultOwner = createServerFn({ method: "POST" }).handler(asy
 });
 
 /**
- * Look up the synthetic email for an employee by their 4-digit PIN.
- * Returns null if not found.
+ * Public PIN-to-email lookup for the login flow.
+ * Does NOT return the PIN itself — only the synthetic email used for password sign-in.
+ * The caller must already know the PIN to call this.
  */
 export const findEmployeeByPin = createServerFn({ method: "POST" })
   .inputValidator((d: { pin: string }) => {
@@ -76,18 +87,18 @@ export const findEmployeeByPin = createServerFn({ method: "POST" })
     };
   });
 
-/**
- * Owner-only: create an employee account.
- * Verifies the calling user is an owner via their bearer token.
- */
+/** Owner-only: create an employee account. */
 export const createEmployee = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((d: { name: string; pin: string; role: "owner" | "manager" | "cashier" }) => {
     if (!d.name?.trim()) throw new Error("الاسم مطلوب");
     if (!/^\d{4}$/.test(d.pin)) throw new Error("الرقم السري 4 أرقام");
+    if (!["owner", "manager", "cashier"].includes(d.role)) throw new Error("دور غير صالح");
     return d;
   })
-  .handler(async ({ data }) => {
-    // Ensure PIN unique.
+  .handler(async ({ data, context }) => {
+    await assertOwner(context.userId);
+
     const { data: clash } = await supabaseAdmin
       .from("employees")
       .select("id")
@@ -117,12 +128,17 @@ export const createEmployee = createServerFn({ method: "POST" })
     return { ok: true, employeeId: emp.id };
   });
 
+/** Owner-only: change an employee's PIN. */
 export const updateEmployeePin = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((d: { employeeId: string; pin: string }) => {
     if (!/^\d{4}$/.test(d.pin)) throw new Error("الرقم السري 4 أرقام");
+    if (!d.employeeId) throw new Error("معرف الموظف مطلوب");
     return d;
   })
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    await assertOwner(context.userId);
+
     const { data: emp } = await supabaseAdmin
       .from("employees")
       .select("id,user_id")
@@ -144,9 +160,15 @@ export const updateEmployeePin = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+/** Owner-only: deactivate an employee. */
 export const deactivateEmployee = createServerFn({ method: "POST" })
-  .inputValidator((d: { employeeId: string }) => d)
-  .handler(async ({ data }) => {
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { employeeId: string }) => {
+    if (!d.employeeId) throw new Error("معرف الموظف مطلوب");
+    return d;
+  })
+  .handler(async ({ data, context }) => {
+    await assertOwner(context.userId);
     await supabaseAdmin.from("employees").update({ active: false }).eq("id", data.employeeId);
     return { ok: true };
   });
