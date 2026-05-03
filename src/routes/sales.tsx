@@ -73,6 +73,7 @@ function SalesPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [settings, setSettings] = useState<SettingsRow | null>(null);
   const [search, setSearch] = useState("");
+  const searchRef = useRef<HTMLInputElement>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [discountType, setDiscountType] = useState<"percent" | "fixed">("percent");
   const [discountValue, setDiscountValue] = useState(0);
@@ -113,12 +114,21 @@ function SalesPage() {
     );
   }, [products, search]);
 
+  const refocusSearch = () => {
+    setTimeout(() => searchRef.current?.focus(), 0);
+  };
+
   const handleScan = (code: string) => {
     const c = code.trim();
     if (!c) return;
     const found = products.find((p) => p.barcode === c);
-    if (found) addToCart(found);
-    else toast.error(`لم يتم العثور على منتج بالباركود: ${c}`);
+    if (found) {
+      addToCart(found);
+    } else {
+      toast.error(`لم يتم العثور على منتج بالباركود: ${c} — جرّب البحث بالاسم`);
+    }
+    setSearch("");
+    refocusSearch();
   };
 
   const handleSearchKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -130,16 +140,23 @@ function SalesPage() {
     if (exact) {
       addToCart(exact);
       setSearch("");
+      refocusSearch();
       return;
     }
     if (filtered.length === 1) {
       addToCart(filtered[0]);
       setSearch("");
+      refocusSearch();
       return;
     }
     if (filtered.length === 0) {
-      toast.error(`لا يوجد منتج مطابق لـ: ${q}`);
+      toast.error(`لا يوجد منتج بالباركود/الاسم: ${q} — تأكد من الباركود أو ابحث بالاسم`);
+      setSearch("");
+      refocusSearch();
+      return;
     }
+    // multiple matches: keep text, show hint
+    toast.message(`${filtered.length} نتيجة — اضغط على المنتج المطلوب أو اكمل الكتابة`);
   };
 
   const addToCart = (p: Product) => {
