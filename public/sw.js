@@ -1,4 +1,4 @@
-// Simple offline-first service worker for the POS app shell.
+// Simple offline-first service worker for the sahl pos app shell.
 // Caches static assets and serves them when offline. Network requests
 // to Supabase or APIs always go to the network (with no offline writes).
 const CACHE = "pos-shell-v1";

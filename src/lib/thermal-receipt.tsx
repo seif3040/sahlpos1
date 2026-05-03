@@ -50,7 +50,7 @@ export function ThermalReceipt({
   return (
     <div id="invoice" className="thermal-receipt" dir="rtl" lang="ar">
       <div className="tr-header">
-        <div className="tr-shop">{settings.shop_name || "متجري"}</div>
+        <div className="tr-shop">{settings.shop_name || "sahl pos"}</div>
         {settings.shop_phone ? <div className="tr-sub">{settings.shop_phone}</div> : null}
         {settings.shop_address ? <div className="tr-sub">{settings.shop_address}</div> : null}
         {settings.receipt_header ? <div className="tr-sub">{settings.receipt_header}</div> : null}
