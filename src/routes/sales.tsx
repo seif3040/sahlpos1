@@ -202,30 +202,39 @@ function SalesPage() {
       return;
     }
 
-    const { data: sale, error } = await supabase
-      .from("sales")
-      .insert({
-        cashier_id: employee?.id,
-        customer_id: customerId || null,
-        subtotal,
-        discount: discountAmt,
-        tax: taxAmt,
-        total,
-        payment_method: paymentMethod,
-        cash_received: cashReceived,
-        change_amount: changeAmount,
-        cash_part: cashPart,
-        card_part: effectiveCardPart,
-      })
-      .select("id,invoice_number,created_at")
-      .single();
-    if (error || !sale) {
-      toast.error(error?.message || "فشل الحفظ");
+    // Insert sale with retry on unique invoice_number conflict (concurrency safety)
+    let sale: { id: string; invoice_number: number; created_at: string } | null = null;
+    let lastErr: { message: string; code?: string } | null = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const { data, error: insErr } = await supabase
+        .from("sales")
+        .insert({
+          cashier_id: employee?.id,
+          customer_id: customerId || null,
+          subtotal,
+          discount: discountAmt,
+          tax: taxAmt,
+          total,
+          payment_method: paymentMethod,
+          cash_received: cashReceived,
+          change_amount: changeAmount,
+          cash_part: cashPart,
+          card_part: effectiveCardPart,
+        })
+        .select("id,invoice_number,created_at")
+        .single();
+      if (data) { sale = data; break; }
+      lastErr = insErr;
+      if (insErr?.code === "23505") continue; // duplicate invoice_number, retry
+      break;
+    }
+    if (!sale) {
+      toast.error(lastErr?.message || "فشل الحفظ");
       return;
     }
 
     const itemsPayload = cart.map((c) => ({
-      sale_id: sale.id,
+      sale_id: sale!.id,
       product_id: c.product.id,
       product_name: c.product.name,
       quantity: c.qty,
