@@ -39,10 +39,26 @@ function CashRegisterPage() {
     if (s?.currency) setCurrency(s.currency);
     if (act) {
       const [{ data: sales }, { data: exp }] = await Promise.all([
-        supabase.from("sales").select("total").gte("created_at", act.opened_at).eq("payment_method", "cash"),
+        supabase
+          .from("sales")
+          .select("total,cash_part,payment_method,sale_items(quantity,refunded_quantity,unit_price)")
+          .gte("created_at", act.opened_at)
+          .in("payment_method", ["cash", "mixed"]),
         supabase.from("expenses").select("amount").gte("created_at", act.opened_at),
       ]);
-      setSalesTotal((sales ?? []).reduce((a, x) => a + Number(x.total), 0));
+      // Cash collected = cash_part for mixed, total for cash; minus refunds proportional to cash share
+      type R = { total: number; cash_part: number; payment_method: string; sale_items?: { quantity: number; refunded_quantity: number; unit_price: number }[] };
+      const cashSum = ((sales ?? []) as R[]).reduce((acc, s) => {
+        const gross = Number(s.total) || 0;
+        const cashShare = s.payment_method === "cash" ? gross : Number(s.cash_part) || 0;
+        const refundedAmt = (s.sale_items ?? []).reduce(
+          (a, it) => a + Number(it.refunded_quantity || 0) * Number(it.unit_price || 0),
+          0,
+        );
+        const cashRatio = gross > 0 ? cashShare / gross : 0;
+        return acc + Math.max(0, cashShare - refundedAmt * cashRatio);
+      }, 0);
+      setSalesTotal(cashSum);
       setExpensesTotal((exp ?? []).reduce((a, x) => a + Number(x.amount), 0));
     }
   };
