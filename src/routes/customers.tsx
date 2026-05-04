@@ -184,21 +184,23 @@ function CustomersPage() {
             <div className="text-center py-8 text-muted-foreground">لا توجد فواتير</div>
           ) : (
             <Table>
-              <TableHeader><TableRow><TableHead>الفاتورة</TableHead><TableHead>التاريخ</TableHead><TableHead>الدفع</TableHead><TableHead>الإجمالي</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead>الفاتورة</TableHead><TableHead>التاريخ</TableHead><TableHead>الدفع</TableHead><TableHead>الإجمالي</TableHead><TableHead>الصافي</TableHead><TableHead>الحالة</TableHead></TableRow></TableHeader>
               <TableBody>
                 {historySales.map(s => (
                   <TableRow key={s.id}>
                     <TableCell>#{s.invoice_number}</TableCell>
                     <TableCell>{formatDate(s.created_at)}</TableCell>
                     <TableCell>{s.payment_method}</TableCell>
-                    <TableCell className="font-bold">{formatMoney(Number(s.total), currency)}</TableCell>
+                    <TableCell>{formatMoney(s.total, currency)}</TableCell>
+                    <TableCell className="font-bold text-primary">{formatMoney(s.net_total, currency)}</TableCell>
+                    <TableCell>{s.is_refunded ? <Badge variant="destructive">مرتجعة</Badge> : s.net_total < s.total ? <Badge variant="secondary">جزئي</Badge> : <Badge variant="outline">سليمة</Badge>}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
           )}
           <DialogFooter>
-            <div className="text-sm text-muted-foreground ml-auto">إجمالي: <strong>{formatMoney(historySales.reduce((a, s) => a + Number(s.total), 0), currency)}</strong></div>
+            <div className="text-sm text-muted-foreground ml-auto">إجمالي صافي: <strong>{formatMoney(historySales.reduce((a, s) => a + s.net_total, 0), currency)}</strong></div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
