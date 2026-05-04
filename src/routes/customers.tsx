@@ -30,17 +30,33 @@ function CustomersPage() {
   const [payAmount, setPayAmount] = useState(0);
   const [currency, setCurrency] = useState("ج.م");
   const [historyFor, setHistoryFor] = useState<Customer | null>(null);
-  const [historySales, setHistorySales] = useState<Array<{ id: string; invoice_number: number; total: number; created_at: string; payment_method: string }>>([]);
+  const [historySales, setHistorySales] = useState<Array<{ id: string; invoice_number: number; total: number; created_at: string; payment_method: string; is_refunded: boolean; net_total: number }>>([]);
 
   const openHistory = async (c: Customer) => {
     setHistoryFor(c);
     const { data } = await supabase
       .from("sales")
-      .select("id,invoice_number,total,created_at,payment_method")
+      .select("id,invoice_number,total,created_at,payment_method,is_refunded,sale_items(quantity,refunded_quantity,unit_price)")
       .eq("customer_id", c.id)
       .order("created_at", { ascending: false })
       .limit(100);
-    setHistorySales((data ?? []) as typeof historySales);
+    type Row = { id: string; invoice_number: number; total: number; created_at: string; payment_method: string; is_refunded: boolean; sale_items?: { quantity: number; refunded_quantity: number; unit_price: number }[] };
+    const rows = ((data ?? []) as Row[]).map((s) => {
+      const refunded = (s.sale_items ?? []).reduce(
+        (a, it) => a + Number(it.refunded_quantity || 0) * Number(it.unit_price || 0),
+        0,
+      );
+      return {
+        id: s.id,
+        invoice_number: s.invoice_number,
+        total: Number(s.total),
+        created_at: s.created_at,
+        payment_method: s.payment_method,
+        is_refunded: s.is_refunded,
+        net_total: Math.max(0, Number(s.total) - refunded),
+      };
+    });
+    setHistorySales(rows);
   };
 
   const load = async () => {
