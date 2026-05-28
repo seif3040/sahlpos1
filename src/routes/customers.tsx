@@ -264,3 +264,17 @@ function CustomersPage() {
     </div>
   );
 }
+
+function Stat({ label, value, tone }: { label: string; value: string; tone?: "primary" | "success" | "destructive" | "warning" }) {
+  const cls =
+    tone === "success" ? "text-success"
+    : tone === "destructive" ? "text-destructive"
+    : tone === "warning" ? "text-warning"
+    : tone === "primary" ? "text-primary" : "";
+  return (
+    <div className="rounded-lg bg-muted/40 p-2">
+      <div className="text-[11px] text-muted-foreground">{label}</div>
+      <div className={`font-bold text-sm ${cls}`}>{value}</div>
+    </div>
+  );
+}
