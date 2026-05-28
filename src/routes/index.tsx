@@ -27,6 +27,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatMoney, todayBounds } from "@/lib/format";
+import { sumNetSales, sumCashCollected, saleProfit, type SaleLike } from "@/lib/calc";
 
 export const Route = createFileRoute("/")({
   component: () => (
@@ -38,6 +39,7 @@ export const Route = createFileRoute("/")({
 
 interface Stats {
   todaySales: number;
+  todayCash: number;
   todayProfit: number;
   todayInvoices: number;
   outstandingDebts: number;
