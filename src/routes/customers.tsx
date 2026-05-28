@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatMoney, formatDate } from "@/lib/format";
+import { buildCustomerStatement, classifySale, itemRefundedAmount, type SaleLike } from "@/lib/calc";
 
 export const Route = createFileRoute("/customers")({
   component: () => (<RequireAuth><CustomersPage /></RequireAuth>),
