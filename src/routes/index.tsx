@@ -174,12 +174,18 @@ function Dashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         <KpiCard
-          title="مبيعات اليوم"
+          title="صافي مبيعات اليوم"
           value={formatMoney(stats.todaySales, currency)}
           icon={Banknote}
           tone="primary"
+        />
+        <KpiCard
+          title="كاش فعلي اليوم"
+          value={formatMoney(stats.todayCash, currency)}
+          icon={Banknote}
+          tone="success"
         />
         <KpiCard
           title="ربح اليوم"
