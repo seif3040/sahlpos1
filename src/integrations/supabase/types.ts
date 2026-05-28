@@ -33,7 +33,7 @@ export type Database = {
           notes?: string | null
           opened_at?: string
           opening_cash?: number
-          tenant_id: string
+          tenant_id?: string
         }
         Update: {
           closed_at?: string | null
@@ -73,7 +73,7 @@ export type Database = {
           created_at?: string
           id?: string
           name: string
-          tenant_id: string
+          tenant_id?: string
         }
         Update: {
           created_at?: string
@@ -112,7 +112,7 @@ export type Database = {
           paid?: number
           remaining?: number | null
           sale_id?: string | null
-          tenant_id: string
+          tenant_id?: string
         }
         Update: {
           amount?: number
@@ -164,7 +164,7 @@ export type Database = {
           name: string
           notes?: string | null
           phone?: string | null
-          tenant_id: string
+          tenant_id?: string
         }
         Update: {
           created_at?: string
@@ -197,7 +197,7 @@ export type Database = {
           created_at?: string
           debt_id?: string | null
           id?: string
-          tenant_id: string
+          tenant_id?: string
         }
         Update: {
           amount?: number
@@ -243,7 +243,7 @@ export type Database = {
           name: string
           pin: string
           role?: Database["public"]["Enums"]["app_role"]
-          tenant_id: string
+          tenant_id?: string
           user_id?: string | null
         }
         Update: {
@@ -286,7 +286,7 @@ export type Database = {
           id?: string
           note?: string | null
           shift_id?: string | null
-          tenant_id: string
+          tenant_id?: string
         }
         Update: {
           amount?: number
@@ -487,7 +487,7 @@ export type Database = {
           purchase_price?: number
           quantity?: number
           selling_price?: number
-          tenant_id: string
+          tenant_id?: string
           updated_at?: string
         }
         Update: {
@@ -539,7 +539,7 @@ export type Database = {
           product_id?: string | null
           purchase_id?: string | null
           quantity: number
-          tenant_id: string
+          tenant_id?: string
           unit_cost: number
         }
         Update: {
@@ -591,7 +591,7 @@ export type Database = {
           notes?: string | null
           paid?: number
           supplier_id?: string | null
-          tenant_id: string
+          tenant_id?: string
           total?: number
         }
         Update: {
@@ -642,7 +642,7 @@ export type Database = {
           quantity: number
           refunded_quantity?: number
           sale_id?: string | null
-          tenant_id: string
+          tenant_id?: string
           unit_price: number
         }
         Update: {
@@ -717,7 +717,7 @@ export type Database = {
           shift_id?: string | null
           subtotal?: number
           tax?: number
-          tenant_id: string
+          tenant_id?: string
           total?: number
         }
         Update: {
@@ -794,7 +794,7 @@ export type Database = {
           shop_name?: string
           shop_phone?: string | null
           tax_percent?: number
-          tenant_id: string
+          tenant_id?: string
           updated_at?: string
         }
         Update: {
@@ -836,7 +836,7 @@ export type Database = {
           id?: string
           reason?: string | null
           shift_id?: string | null
-          tenant_id: string
+          tenant_id?: string
           type: string
         }
         Update: {
@@ -880,7 +880,7 @@ export type Database = {
           name: string
           notes?: string | null
           phone?: string | null
-          tenant_id: string
+          tenant_id?: string
         }
         Update: {
           created_at?: string
