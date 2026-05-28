@@ -27,6 +27,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatMoney, todayBounds } from "@/lib/format";
+import { sumNetSales, sumCashCollected, saleProfit, type SaleLike } from "@/lib/calc";
 
 export const Route = createFileRoute("/")({
   component: () => (
@@ -38,6 +39,7 @@ export const Route = createFileRoute("/")({
 
 interface Stats {
   todaySales: number;
+  todayCash: number;
   todayProfit: number;
   todayInvoices: number;
   outstandingDebts: number;
@@ -49,6 +51,7 @@ const COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899"
 function Dashboard() {
   const [stats, setStats] = useState<Stats>({
     todaySales: 0,
+    todayCash: 0,
     todayProfit: 0,
     todayInvoices: 0,
     outstandingDebts: 0,
@@ -66,14 +69,12 @@ function Dashboard() {
         supabase.from("settings").select("currency").eq("id", 1).maybeSingle(),
         supabase
           .from("sales")
-          .select("id,total,created_at,is_refunded,sale_items(quantity,refunded_quantity,unit_price,cost_price,product_name)")
-          .eq("is_refunded", false)
+          .select("id,total,cash_part,payment_method,created_at,is_refunded,sale_items(quantity,refunded_quantity,unit_price,cost_price,product_name)")
           .gte("created_at", startISO)
           .lte("created_at", endISO),
         supabase
           .from("sales")
-          .select("created_at,total,is_refunded,sale_items(product_name,quantity,refunded_quantity,unit_price)")
-          .eq("is_refunded", false)
+          .select("created_at,total,cash_part,payment_method,is_refunded,sale_items(product_name,quantity,refunded_quantity,unit_price)")
           .gte("created_at", new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString()),
         supabase.from("customer_debts").select("remaining").eq("is_settled", false),
         supabase.from("products").select("id").eq("is_low_stock", true),
@@ -81,24 +82,21 @@ function Dashboard() {
 
     if (settings?.currency) setCurrency(settings.currency);
 
-    let sumSales = 0;
-    let sumProfit = 0;
-    for (const s of salesToday ?? []) {
-      let saleNet = 0;
-      for (const it of (s as { sale_items?: { quantity: number; refunded_quantity?: number; unit_price: number; cost_price: number }[] }).sale_items ?? []) {
-        const eff = Number(it.quantity) - Number(it.refunded_quantity ?? 0);
-        if (eff <= 0) continue;
-        saleNet += Number(it.unit_price) * eff;
-        sumProfit += (Number(it.unit_price) - Number(it.cost_price)) * eff;
-      }
-      sumSales += saleNet;
-    }
+    const todaySaleList = (salesToday ?? []) as SaleLike[];
+    const sumSales = sumNetSales(todaySaleList);
+    const sumCash = sumCashCollected(todaySaleList);
+    const sumProfit = todaySaleList.reduce((a, s) => a + saleProfit(s), 0);
+    // count only invoices that are not fully refunded
+    const validCount = (salesToday ?? []).filter(
+      (s) => !(s as { is_refunded?: boolean }).is_refunded,
+    ).length;
     const debtsSum = (debts ?? []).reduce((a, d) => a + Number(d.remaining), 0);
 
     setStats({
       todaySales: sumSales,
+      todayCash: sumCash,
       todayProfit: sumProfit,
-      todayInvoices: salesToday?.length ?? 0,
+      todayInvoices: validCount,
       outstandingDebts: debtsSum,
       lowStockCount: lowStock?.length ?? 0,
     });
@@ -176,12 +174,18 @@ function Dashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         <KpiCard
-          title="مبيعات اليوم"
+          title="صافي مبيعات اليوم"
           value={formatMoney(stats.todaySales, currency)}
           icon={Banknote}
           tone="primary"
+        />
+        <KpiCard
+          title="كاش فعلي اليوم"
+          value={formatMoney(stats.todayCash, currency)}
+          icon={Banknote}
+          tone="success"
         />
         <KpiCard
           title="ربح اليوم"

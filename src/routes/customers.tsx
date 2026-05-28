@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatMoney, formatDate } from "@/lib/format";
+import { buildCustomerStatement, classifySale, itemRefundedAmount, type SaleLike } from "@/lib/calc";
 
 export const Route = createFileRoute("/customers")({
   component: () => (<RequireAuth><CustomersPage /></RequireAuth>),
@@ -30,22 +31,28 @@ function CustomersPage() {
   const [payAmount, setPayAmount] = useState(0);
   const [currency, setCurrency] = useState("ج.م");
   const [historyFor, setHistoryFor] = useState<Customer | null>(null);
-  const [historySales, setHistorySales] = useState<Array<{ id: string; invoice_number: number; total: number; created_at: string; payment_method: string; is_refunded: boolean; net_total: number }>>([]);
+  const [historySales, setHistorySales] = useState<Array<{ id: string; invoice_number: number; total: number; created_at: string; payment_method: string; is_refunded: boolean; net_total: number; refunded_amount: number; status: string }>>([]);
+  const [historyDebts, setHistoryDebts] = useState<Array<{ id: string; amount: number; paid: number; remaining: number; is_settled: boolean; created_at: string }>>([]);
+  const [historyPayments, setHistoryPayments] = useState<Array<{ id: string; amount: number; created_at: string }>>([]);
 
   const openHistory = async (c: Customer) => {
     setHistoryFor(c);
-    const { data } = await supabase
-      .from("sales")
-      .select("id,invoice_number,total,created_at,payment_method,is_refunded,sale_items(quantity,refunded_quantity,unit_price)")
-      .eq("customer_id", c.id)
-      .order("created_at", { ascending: false })
-      .limit(100);
-    type Row = { id: string; invoice_number: number; total: number; created_at: string; payment_method: string; is_refunded: boolean; sale_items?: { quantity: number; refunded_quantity: number; unit_price: number }[] };
-    const rows = ((data ?? []) as Row[]).map((s) => {
-      const refunded = (s.sale_items ?? []).reduce(
-        (a, it) => a + Number(it.refunded_quantity || 0) * Number(it.unit_price || 0),
-        0,
-      );
+    const [{ data: salesData }, { data: debtsData }] = await Promise.all([
+      supabase
+        .from("sales")
+        .select("id,invoice_number,total,cash_part,payment_method,created_at,is_refunded,sale_items(quantity,refunded_quantity,unit_price)")
+        .eq("customer_id", c.id)
+        .order("created_at", { ascending: false })
+        .limit(200),
+      supabase
+        .from("customer_debts")
+        .select("id,amount,paid,remaining,is_settled,created_at")
+        .eq("customer_id", c.id)
+        .order("created_at", { ascending: false }),
+    ]);
+    type Row = SaleLike & { id: string; invoice_number: number; created_at: string; is_refunded: boolean };
+    const rows = ((salesData ?? []) as Row[]).map((s) => {
+      const refunded = itemRefundedAmount(s.sale_items);
       return {
         id: s.id,
         invoice_number: s.invoice_number,
@@ -54,9 +61,23 @@ function CustomersPage() {
         payment_method: s.payment_method,
         is_refunded: s.is_refunded,
         net_total: Math.max(0, Number(s.total) - refunded),
+        refunded_amount: refunded,
+        status: classifySale(s),
       };
     });
     setHistorySales(rows);
+    setHistoryDebts((debtsData ?? []) as typeof historyDebts);
+    const debtIds = (debtsData ?? []).map((d) => d.id);
+    if (debtIds.length) {
+      const { data: pays } = await supabase
+        .from("debt_payments")
+        .select("id,amount,created_at,debt_id")
+        .in("debt_id", debtIds)
+        .order("created_at", { ascending: false });
+      setHistoryPayments((pays ?? []) as typeof historyPayments);
+    } else {
+      setHistoryPayments([]);
+    }
   };
 
   const load = async () => {
@@ -178,32 +199,82 @@ function CustomersPage() {
       </Dialog>
 
       <Dialog open={!!historyFor} onOpenChange={v => !v && setHistoryFor(null)}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>سجل مشتريات: {historyFor?.name}</DialogTitle></DialogHeader>
-          {historySales.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">لا توجد فواتير</div>
-          ) : (
-            <Table>
-              <TableHeader><TableRow><TableHead>الفاتورة</TableHead><TableHead>التاريخ</TableHead><TableHead>الدفع</TableHead><TableHead>الإجمالي</TableHead><TableHead>الصافي</TableHead><TableHead>الحالة</TableHead></TableRow></TableHeader>
-              <TableBody>
-                {historySales.map(s => (
-                  <TableRow key={s.id}>
-                    <TableCell>#{s.invoice_number}</TableCell>
-                    <TableCell>{formatDate(s.created_at)}</TableCell>
-                    <TableCell>{s.payment_method}</TableCell>
-                    <TableCell>{formatMoney(s.total, currency)}</TableCell>
-                    <TableCell className="font-bold text-primary">{formatMoney(s.net_total, currency)}</TableCell>
-                    <TableCell>{s.is_refunded ? <Badge variant="destructive">مرتجعة</Badge> : s.net_total < s.total ? <Badge variant="secondary">جزئي</Badge> : <Badge variant="outline">سليمة</Badge>}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-          <DialogFooter>
-            <div className="text-sm text-muted-foreground ml-auto">إجمالي صافي: <strong>{formatMoney(historySales.reduce((a, s) => a + s.net_total, 0), currency)}</strong></div>
-          </DialogFooter>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>كشف حساب: {historyFor?.name}</DialogTitle></DialogHeader>
+          {(() => {
+            const stmt = buildCustomerStatement({ sales: historySales as unknown as Parameters<typeof buildCustomerStatement>[0]["sales"], debts: historyDebts });
+            return (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
+                <Stat label="عدد الفواتير" value={String(stmt.invoicesCount)} />
+                <Stat label="إجمالي المبيعات" value={formatMoney(stmt.gross, currency)} />
+                <Stat label="المرتجعات" value={formatMoney(stmt.refunds, currency)} tone="destructive" />
+                <Stat label="الصافي بعد المرتجع" value={formatMoney(stmt.net, currency)} tone="primary" />
+                <Stat label="إجمالي الديون" value={formatMoney(stmt.debtTotal, currency)} />
+                <Stat label="مدفوع من الديون" value={formatMoney(stmt.debtPaid, currency)} tone="success" />
+                <Stat label="رصيد الدين المتبقي" value={formatMoney(stmt.debtRemaining, currency)} tone={stmt.debtRemaining > 0 ? "destructive" : "success"} />
+                <Stat label="الحالة" value={stmt.debtRemaining > 0 ? "عليه مستحقات" : "سداد كامل"} tone={stmt.debtRemaining > 0 ? "warning" : "success"} />
+              </div>
+            );
+          })()}
+          <div className="space-y-4">
+            <div>
+              <h3 className="font-bold mb-2 text-sm">الفواتير</h3>
+              {historySales.length === 0 ? (
+                <div className="text-center py-4 text-muted-foreground text-sm">لا توجد فواتير</div>
+              ) : (
+                <Table>
+                  <TableHeader><TableRow><TableHead>الفاتورة</TableHead><TableHead>التاريخ</TableHead><TableHead>الدفع</TableHead><TableHead>الإجمالي</TableHead><TableHead>المرتجع</TableHead><TableHead>الصافي</TableHead><TableHead>الحالة</TableHead></TableRow></TableHeader>
+                  <TableBody>
+                    {historySales.map(s => (
+                      <TableRow key={s.id}>
+                        <TableCell>#{s.invoice_number}</TableCell>
+                        <TableCell>{formatDate(s.created_at)}</TableCell>
+                        <TableCell>{s.payment_method}</TableCell>
+                        <TableCell>{formatMoney(s.total, currency)}</TableCell>
+                        <TableCell className="text-destructive">{s.refunded_amount > 0 ? formatMoney(s.refunded_amount, currency) : "-"}</TableCell>
+                        <TableCell className="font-bold text-primary">{formatMoney(s.net_total, currency)}</TableCell>
+                        <TableCell>{s.status === "مرتجعة" ? <Badge variant="destructive">مرتجعة</Badge> : s.status === "جزئي" ? <Badge variant="secondary">جزئي</Badge> : <Badge variant="outline">سليمة</Badge>}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </div>
+            <div>
+              <h3 className="font-bold mb-2 text-sm">المدفوعات على الديون</h3>
+              {historyPayments.length === 0 ? (
+                <div className="text-center py-4 text-muted-foreground text-sm">لا توجد دفعات مسجّلة</div>
+              ) : (
+                <Table>
+                  <TableHeader><TableRow><TableHead>التاريخ</TableHead><TableHead>المبلغ</TableHead></TableRow></TableHeader>
+                  <TableBody>
+                    {historyPayments.map(p => (
+                      <TableRow key={p.id}>
+                        <TableCell>{formatDate(p.created_at)}</TableCell>
+                        <TableCell className="text-success font-medium">{formatMoney(Number(p.amount), currency)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+function Stat({ label, value, tone }: { label: string; value: string; tone?: "primary" | "success" | "destructive" | "warning" }) {
+  const cls =
+    tone === "success" ? "text-success"
+    : tone === "destructive" ? "text-destructive"
+    : tone === "warning" ? "text-warning"
+    : tone === "primary" ? "text-primary" : "";
+  return (
+    <div className="rounded-lg bg-muted/40 p-2">
+      <div className="text-[11px] text-muted-foreground">{label}</div>
+      <div className={`font-bold text-sm ${cls}`}>{value}</div>
     </div>
   );
 }
