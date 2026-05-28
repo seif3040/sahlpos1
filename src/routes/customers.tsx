@@ -199,30 +199,66 @@ function CustomersPage() {
       </Dialog>
 
       <Dialog open={!!historyFor} onOpenChange={v => !v && setHistoryFor(null)}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>سجل مشتريات: {historyFor?.name}</DialogTitle></DialogHeader>
-          {historySales.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">لا توجد فواتير</div>
-          ) : (
-            <Table>
-              <TableHeader><TableRow><TableHead>الفاتورة</TableHead><TableHead>التاريخ</TableHead><TableHead>الدفع</TableHead><TableHead>الإجمالي</TableHead><TableHead>الصافي</TableHead><TableHead>الحالة</TableHead></TableRow></TableHeader>
-              <TableBody>
-                {historySales.map(s => (
-                  <TableRow key={s.id}>
-                    <TableCell>#{s.invoice_number}</TableCell>
-                    <TableCell>{formatDate(s.created_at)}</TableCell>
-                    <TableCell>{s.payment_method}</TableCell>
-                    <TableCell>{formatMoney(s.total, currency)}</TableCell>
-                    <TableCell className="font-bold text-primary">{formatMoney(s.net_total, currency)}</TableCell>
-                    <TableCell>{s.is_refunded ? <Badge variant="destructive">مرتجعة</Badge> : s.net_total < s.total ? <Badge variant="secondary">جزئي</Badge> : <Badge variant="outline">سليمة</Badge>}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-          <DialogFooter>
-            <div className="text-sm text-muted-foreground ml-auto">إجمالي صافي: <strong>{formatMoney(historySales.reduce((a, s) => a + s.net_total, 0), currency)}</strong></div>
-          </DialogFooter>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>كشف حساب: {historyFor?.name}</DialogTitle></DialogHeader>
+          {(() => {
+            const stmt = buildCustomerStatement({ sales: historySales as unknown as Parameters<typeof buildCustomerStatement>[0]["sales"], debts: historyDebts });
+            return (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
+                <Stat label="عدد الفواتير" value={String(stmt.invoicesCount)} />
+                <Stat label="إجمالي المبيعات" value={formatMoney(stmt.gross, currency)} />
+                <Stat label="المرتجعات" value={formatMoney(stmt.refunds, currency)} tone="destructive" />
+                <Stat label="الصافي بعد المرتجع" value={formatMoney(stmt.net, currency)} tone="primary" />
+                <Stat label="إجمالي الديون" value={formatMoney(stmt.debtTotal, currency)} />
+                <Stat label="مدفوع من الديون" value={formatMoney(stmt.debtPaid, currency)} tone="success" />
+                <Stat label="رصيد الدين المتبقي" value={formatMoney(stmt.debtRemaining, currency)} tone={stmt.debtRemaining > 0 ? "destructive" : "success"} />
+                <Stat label="الحالة" value={stmt.debtRemaining > 0 ? "عليه مستحقات" : "سداد كامل"} tone={stmt.debtRemaining > 0 ? "warning" : "success"} />
+              </div>
+            );
+          })()}
+          <div className="space-y-4">
+            <div>
+              <h3 className="font-bold mb-2 text-sm">الفواتير</h3>
+              {historySales.length === 0 ? (
+                <div className="text-center py-4 text-muted-foreground text-sm">لا توجد فواتير</div>
+              ) : (
+                <Table>
+                  <TableHeader><TableRow><TableHead>الفاتورة</TableHead><TableHead>التاريخ</TableHead><TableHead>الدفع</TableHead><TableHead>الإجمالي</TableHead><TableHead>المرتجع</TableHead><TableHead>الصافي</TableHead><TableHead>الحالة</TableHead></TableRow></TableHeader>
+                  <TableBody>
+                    {historySales.map(s => (
+                      <TableRow key={s.id}>
+                        <TableCell>#{s.invoice_number}</TableCell>
+                        <TableCell>{formatDate(s.created_at)}</TableCell>
+                        <TableCell>{s.payment_method}</TableCell>
+                        <TableCell>{formatMoney(s.total, currency)}</TableCell>
+                        <TableCell className="text-destructive">{s.refunded_amount > 0 ? formatMoney(s.refunded_amount, currency) : "-"}</TableCell>
+                        <TableCell className="font-bold text-primary">{formatMoney(s.net_total, currency)}</TableCell>
+                        <TableCell>{s.status === "مرتجعة" ? <Badge variant="destructive">مرتجعة</Badge> : s.status === "جزئي" ? <Badge variant="secondary">جزئي</Badge> : <Badge variant="outline">سليمة</Badge>}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </div>
+            <div>
+              <h3 className="font-bold mb-2 text-sm">المدفوعات على الديون</h3>
+              {historyPayments.length === 0 ? (
+                <div className="text-center py-4 text-muted-foreground text-sm">لا توجد دفعات مسجّلة</div>
+              ) : (
+                <Table>
+                  <TableHeader><TableRow><TableHead>التاريخ</TableHead><TableHead>المبلغ</TableHead></TableRow></TableHeader>
+                  <TableBody>
+                    {historyPayments.map(p => (
+                      <TableRow key={p.id}>
+                        <TableCell>{formatDate(p.created_at)}</TableCell>
+                        <TableCell className="text-success font-medium">{formatMoney(Number(p.amount), currency)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
