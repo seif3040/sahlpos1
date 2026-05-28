@@ -31,22 +31,28 @@ function CustomersPage() {
   const [payAmount, setPayAmount] = useState(0);
   const [currency, setCurrency] = useState("ج.م");
   const [historyFor, setHistoryFor] = useState<Customer | null>(null);
-  const [historySales, setHistorySales] = useState<Array<{ id: string; invoice_number: number; total: number; created_at: string; payment_method: string; is_refunded: boolean; net_total: number }>>([]);
+  const [historySales, setHistorySales] = useState<Array<{ id: string; invoice_number: number; total: number; created_at: string; payment_method: string; is_refunded: boolean; net_total: number; refunded_amount: number; status: string }>>([]);
+  const [historyDebts, setHistoryDebts] = useState<Array<{ id: string; amount: number; paid: number; remaining: number; is_settled: boolean; created_at: string }>>([]);
+  const [historyPayments, setHistoryPayments] = useState<Array<{ id: string; amount: number; created_at: string }>>([]);
 
   const openHistory = async (c: Customer) => {
     setHistoryFor(c);
-    const { data } = await supabase
-      .from("sales")
-      .select("id,invoice_number,total,created_at,payment_method,is_refunded,sale_items(quantity,refunded_quantity,unit_price)")
-      .eq("customer_id", c.id)
-      .order("created_at", { ascending: false })
-      .limit(100);
-    type Row = { id: string; invoice_number: number; total: number; created_at: string; payment_method: string; is_refunded: boolean; sale_items?: { quantity: number; refunded_quantity: number; unit_price: number }[] };
-    const rows = ((data ?? []) as Row[]).map((s) => {
-      const refunded = (s.sale_items ?? []).reduce(
-        (a, it) => a + Number(it.refunded_quantity || 0) * Number(it.unit_price || 0),
-        0,
-      );
+    const [{ data: salesData }, { data: debtsData }] = await Promise.all([
+      supabase
+        .from("sales")
+        .select("id,invoice_number,total,cash_part,payment_method,created_at,is_refunded,sale_items(quantity,refunded_quantity,unit_price)")
+        .eq("customer_id", c.id)
+        .order("created_at", { ascending: false })
+        .limit(200),
+      supabase
+        .from("customer_debts")
+        .select("id,amount,paid,remaining,is_settled,created_at")
+        .eq("customer_id", c.id)
+        .order("created_at", { ascending: false }),
+    ]);
+    type Row = SaleLike & { id: string; invoice_number: number; created_at: string; is_refunded: boolean };
+    const rows = ((salesData ?? []) as Row[]).map((s) => {
+      const refunded = itemRefundedAmount(s.sale_items);
       return {
         id: s.id,
         invoice_number: s.invoice_number,
@@ -55,9 +61,23 @@ function CustomersPage() {
         payment_method: s.payment_method,
         is_refunded: s.is_refunded,
         net_total: Math.max(0, Number(s.total) - refunded),
+        refunded_amount: refunded,
+        status: classifySale(s),
       };
     });
     setHistorySales(rows);
+    setHistoryDebts((debtsData ?? []) as typeof historyDebts);
+    const debtIds = (debtsData ?? []).map((d) => d.id);
+    if (debtIds.length) {
+      const { data: pays } = await supabase
+        .from("debt_payments")
+        .select("id,amount,created_at,debt_id")
+        .in("debt_id", debtIds)
+        .order("created_at", { ascending: false });
+      setHistoryPayments((pays ?? []) as typeof historyPayments);
+    } else {
+      setHistoryPayments([]);
+    }
   };
 
   const load = async () => {
