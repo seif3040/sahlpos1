@@ -29,7 +29,7 @@ import { Badge } from "@/components/ui/badge";
 import { formatMoney, todayBounds } from "@/lib/format";
 import { sumNetSales, sumCashCollected, saleProfit, type SaleLike } from "@/lib/calc";
 
-export const Route = createFileRoute("/")({
+export const Route = createFileRoute("/app")({
   component: () => (
     <RequireAuth>
       <Dashboard />
