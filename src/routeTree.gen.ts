@@ -16,11 +16,16 @@ import { Route as ReportsRouteImport } from './routes/reports'
 import { Route as RefundsRouteImport } from './routes/refunds'
 import { Route as PurchasesRouteImport } from './routes/purchases'
 import { Route as ProductsRouteImport } from './routes/products'
+import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as FeaturesRouteImport } from './routes/features'
 import { Route as ExpensesRouteImport } from './routes/expenses'
 import { Route as CustomersRouteImport } from './routes/customers'
 import { Route as CashRegisterRouteImport } from './routes/cash-register'
+import { Route as AppRouteImport } from './routes/app'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as PosSlugRouteImport } from './routes/pos.$slug'
+import { Route as CheckoutPlanRouteImport } from './routes/checkout.$plan'
 
 const SuppliersRoute = SuppliersRouteImport.update({
   id: '/suppliers',
@@ -57,9 +62,19 @@ const ProductsRoute = ProductsRouteImport.update({
   path: '/products',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PricingRoute = PricingRouteImport.update({
+  id: '/pricing',
+  path: '/pricing',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FeaturesRoute = FeaturesRouteImport.update({
+  id: '/features',
+  path: '/features',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ExpensesRoute = ExpensesRouteImport.update({
@@ -77,18 +92,36 @@ const CashRegisterRoute = CashRegisterRouteImport.update({
   path: '/cash-register',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppRoute = AppRouteImport.update({
+  id: '/app',
+  path: '/app',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PosSlugRoute = PosSlugRouteImport.update({
+  id: '/pos/$slug',
+  path: '/pos/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CheckoutPlanRoute = CheckoutPlanRouteImport.update({
+  id: '/checkout/$plan',
+  path: '/checkout/$plan',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/app': typeof AppRoute
   '/cash-register': typeof CashRegisterRoute
   '/customers': typeof CustomersRoute
   '/expenses': typeof ExpensesRoute
+  '/features': typeof FeaturesRoute
   '/login': typeof LoginRoute
+  '/pricing': typeof PricingRoute
   '/products': typeof ProductsRoute
   '/purchases': typeof PurchasesRoute
   '/refunds': typeof RefundsRoute
@@ -96,13 +129,18 @@ export interface FileRoutesByFullPath {
   '/sales': typeof SalesRoute
   '/settings': typeof SettingsRoute
   '/suppliers': typeof SuppliersRoute
+  '/checkout/$plan': typeof CheckoutPlanRoute
+  '/pos/$slug': typeof PosSlugRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/app': typeof AppRoute
   '/cash-register': typeof CashRegisterRoute
   '/customers': typeof CustomersRoute
   '/expenses': typeof ExpensesRoute
+  '/features': typeof FeaturesRoute
   '/login': typeof LoginRoute
+  '/pricing': typeof PricingRoute
   '/products': typeof ProductsRoute
   '/purchases': typeof PurchasesRoute
   '/refunds': typeof RefundsRoute
@@ -110,14 +148,19 @@ export interface FileRoutesByTo {
   '/sales': typeof SalesRoute
   '/settings': typeof SettingsRoute
   '/suppliers': typeof SuppliersRoute
+  '/checkout/$plan': typeof CheckoutPlanRoute
+  '/pos/$slug': typeof PosSlugRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/app': typeof AppRoute
   '/cash-register': typeof CashRegisterRoute
   '/customers': typeof CustomersRoute
   '/expenses': typeof ExpensesRoute
+  '/features': typeof FeaturesRoute
   '/login': typeof LoginRoute
+  '/pricing': typeof PricingRoute
   '/products': typeof ProductsRoute
   '/purchases': typeof PurchasesRoute
   '/refunds': typeof RefundsRoute
@@ -125,15 +168,20 @@ export interface FileRoutesById {
   '/sales': typeof SalesRoute
   '/settings': typeof SettingsRoute
   '/suppliers': typeof SuppliersRoute
+  '/checkout/$plan': typeof CheckoutPlanRoute
+  '/pos/$slug': typeof PosSlugRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/app'
     | '/cash-register'
     | '/customers'
     | '/expenses'
+    | '/features'
     | '/login'
+    | '/pricing'
     | '/products'
     | '/purchases'
     | '/refunds'
@@ -141,13 +189,18 @@ export interface FileRouteTypes {
     | '/sales'
     | '/settings'
     | '/suppliers'
+    | '/checkout/$plan'
+    | '/pos/$slug'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/app'
     | '/cash-register'
     | '/customers'
     | '/expenses'
+    | '/features'
     | '/login'
+    | '/pricing'
     | '/products'
     | '/purchases'
     | '/refunds'
@@ -155,13 +208,18 @@ export interface FileRouteTypes {
     | '/sales'
     | '/settings'
     | '/suppliers'
+    | '/checkout/$plan'
+    | '/pos/$slug'
   id:
     | '__root__'
     | '/'
+    | '/app'
     | '/cash-register'
     | '/customers'
     | '/expenses'
+    | '/features'
     | '/login'
+    | '/pricing'
     | '/products'
     | '/purchases'
     | '/refunds'
@@ -169,14 +227,19 @@ export interface FileRouteTypes {
     | '/sales'
     | '/settings'
     | '/suppliers'
+    | '/checkout/$plan'
+    | '/pos/$slug'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AppRoute: typeof AppRoute
   CashRegisterRoute: typeof CashRegisterRoute
   CustomersRoute: typeof CustomersRoute
   ExpensesRoute: typeof ExpensesRoute
+  FeaturesRoute: typeof FeaturesRoute
   LoginRoute: typeof LoginRoute
+  PricingRoute: typeof PricingRoute
   ProductsRoute: typeof ProductsRoute
   PurchasesRoute: typeof PurchasesRoute
   RefundsRoute: typeof RefundsRoute
@@ -184,6 +247,8 @@ export interface RootRouteChildren {
   SalesRoute: typeof SalesRoute
   SettingsRoute: typeof SettingsRoute
   SuppliersRoute: typeof SuppliersRoute
+  CheckoutPlanRoute: typeof CheckoutPlanRoute
+  PosSlugRoute: typeof PosSlugRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -237,11 +302,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProductsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/pricing': {
+      id: '/pricing'
+      path: '/pricing'
+      fullPath: '/pricing'
+      preLoaderRoute: typeof PricingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/login': {
       id: '/login'
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/features': {
+      id: '/features'
+      path: '/features'
+      fullPath: '/features'
+      preLoaderRoute: typeof FeaturesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/expenses': {
@@ -265,6 +344,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CashRegisterRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/app': {
+      id: '/app'
+      path: '/app'
+      fullPath: '/app'
+      preLoaderRoute: typeof AppRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -272,15 +358,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/pos/$slug': {
+      id: '/pos/$slug'
+      path: '/pos/$slug'
+      fullPath: '/pos/$slug'
+      preLoaderRoute: typeof PosSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/checkout/$plan': {
+      id: '/checkout/$plan'
+      path: '/checkout/$plan'
+      fullPath: '/checkout/$plan'
+      preLoaderRoute: typeof CheckoutPlanRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AppRoute: AppRoute,
   CashRegisterRoute: CashRegisterRoute,
   CustomersRoute: CustomersRoute,
   ExpensesRoute: ExpensesRoute,
+  FeaturesRoute: FeaturesRoute,
   LoginRoute: LoginRoute,
+  PricingRoute: PricingRoute,
   ProductsRoute: ProductsRoute,
   PurchasesRoute: PurchasesRoute,
   RefundsRoute: RefundsRoute,
@@ -288,6 +391,8 @@ const rootRouteChildren: RootRouteChildren = {
   SalesRoute: SalesRoute,
   SettingsRoute: SettingsRoute,
   SuppliersRoute: SuppliersRoute,
+  CheckoutPlanRoute: CheckoutPlanRoute,
+  PosSlugRoute: PosSlugRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -24,7 +24,7 @@ import { roleLabel } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 const NAV = [
-  { to: "/", label: "الرئيسية", icon: LayoutDashboard, level: 1 as const },
+  { to: "/app", label: "الرئيسية", icon: LayoutDashboard, level: 1 as const },
   { to: "/sales", label: "المبيعات", icon: ShoppingCart, level: 1 as const },
   { to: "/products", label: "المنتجات", icon: Package, level: 2 as const },
   { to: "/purchases", label: "المشتريات", icon: Truck, level: 2 as const },
