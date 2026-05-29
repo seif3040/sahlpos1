@@ -26,7 +26,7 @@ function LoginPage() {
   }, []);
 
   useEffect(() => {
-    if (employee) navigate({ to: "/" });
+    if (employee) navigate({ to: "/app" });
   }, [employee, navigate]);
 
   const submitPin = async (fullPin: string) => {
@@ -49,7 +49,7 @@ function LoginPage() {
       }
       toast.success(`أهلاً ${res.employee.name}`);
       await refresh();
-      navigate({ to: "/" });
+      navigate({ to: "/app" });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "حدث خطأ");
       setPin("");
