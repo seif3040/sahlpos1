@@ -16,7 +16,9 @@ import { Route as ReportsRouteImport } from './routes/reports'
 import { Route as RefundsRouteImport } from './routes/refunds'
 import { Route as PurchasesRouteImport } from './routes/purchases'
 import { Route as ProductsRouteImport } from './routes/products'
+import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as FeaturesRouteImport } from './routes/features'
 import { Route as ExpensesRouteImport } from './routes/expenses'
 import { Route as CustomersRouteImport } from './routes/customers'
 import { Route as CashRegisterRouteImport } from './routes/cash-register'
@@ -58,9 +60,19 @@ const ProductsRoute = ProductsRouteImport.update({
   path: '/products',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PricingRoute = PricingRouteImport.update({
+  id: '/pricing',
+  path: '/pricing',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FeaturesRoute = FeaturesRouteImport.update({
+  id: '/features',
+  path: '/features',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ExpensesRoute = ExpensesRouteImport.update({
@@ -95,7 +107,9 @@ export interface FileRoutesByFullPath {
   '/cash-register': typeof CashRegisterRoute
   '/customers': typeof CustomersRoute
   '/expenses': typeof ExpensesRoute
+  '/features': typeof FeaturesRoute
   '/login': typeof LoginRoute
+  '/pricing': typeof PricingRoute
   '/products': typeof ProductsRoute
   '/purchases': typeof PurchasesRoute
   '/refunds': typeof RefundsRoute
@@ -110,7 +124,9 @@ export interface FileRoutesByTo {
   '/cash-register': typeof CashRegisterRoute
   '/customers': typeof CustomersRoute
   '/expenses': typeof ExpensesRoute
+  '/features': typeof FeaturesRoute
   '/login': typeof LoginRoute
+  '/pricing': typeof PricingRoute
   '/products': typeof ProductsRoute
   '/purchases': typeof PurchasesRoute
   '/refunds': typeof RefundsRoute
@@ -126,7 +142,9 @@ export interface FileRoutesById {
   '/cash-register': typeof CashRegisterRoute
   '/customers': typeof CustomersRoute
   '/expenses': typeof ExpensesRoute
+  '/features': typeof FeaturesRoute
   '/login': typeof LoginRoute
+  '/pricing': typeof PricingRoute
   '/products': typeof ProductsRoute
   '/purchases': typeof PurchasesRoute
   '/refunds': typeof RefundsRoute
@@ -143,7 +161,9 @@ export interface FileRouteTypes {
     | '/cash-register'
     | '/customers'
     | '/expenses'
+    | '/features'
     | '/login'
+    | '/pricing'
     | '/products'
     | '/purchases'
     | '/refunds'
@@ -158,7 +178,9 @@ export interface FileRouteTypes {
     | '/cash-register'
     | '/customers'
     | '/expenses'
+    | '/features'
     | '/login'
+    | '/pricing'
     | '/products'
     | '/purchases'
     | '/refunds'
@@ -173,7 +195,9 @@ export interface FileRouteTypes {
     | '/cash-register'
     | '/customers'
     | '/expenses'
+    | '/features'
     | '/login'
+    | '/pricing'
     | '/products'
     | '/purchases'
     | '/refunds'
@@ -189,7 +213,9 @@ export interface RootRouteChildren {
   CashRegisterRoute: typeof CashRegisterRoute
   CustomersRoute: typeof CustomersRoute
   ExpensesRoute: typeof ExpensesRoute
+  FeaturesRoute: typeof FeaturesRoute
   LoginRoute: typeof LoginRoute
+  PricingRoute: typeof PricingRoute
   ProductsRoute: typeof ProductsRoute
   PurchasesRoute: typeof PurchasesRoute
   RefundsRoute: typeof RefundsRoute
@@ -250,11 +276,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProductsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/pricing': {
+      id: '/pricing'
+      path: '/pricing'
+      fullPath: '/pricing'
+      preLoaderRoute: typeof PricingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/login': {
       id: '/login'
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/features': {
+      id: '/features'
+      path: '/features'
+      fullPath: '/features'
+      preLoaderRoute: typeof FeaturesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/expenses': {
@@ -301,7 +341,9 @@ const rootRouteChildren: RootRouteChildren = {
   CashRegisterRoute: CashRegisterRoute,
   CustomersRoute: CustomersRoute,
   ExpensesRoute: ExpensesRoute,
+  FeaturesRoute: FeaturesRoute,
   LoginRoute: LoginRoute,
+  PricingRoute: PricingRoute,
   ProductsRoute: ProductsRoute,
   PurchasesRoute: PurchasesRoute,
   RefundsRoute: RefundsRoute,
