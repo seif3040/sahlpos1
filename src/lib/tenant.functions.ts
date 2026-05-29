@@ -217,7 +217,7 @@ export const submitPayment = createServerFn({ method: "POST" })
 
     await supabaseAdmin
       .from("payment_submissions")
-      .update({ tenant_id: tenant.id, status: "approved", account_created: true, reviewed_at: new Date().toISOString() })
+      .update({ tenant_id: tenant.id, status: "admin_approved", account_created: true, reviewed_at: new Date().toISOString() })
       .eq("id", sub.id);
 
     return {
