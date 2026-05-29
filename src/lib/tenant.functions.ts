@@ -140,9 +140,12 @@ export const submitPayment = createServerFn({ method: "POST" })
       method: data.method,
       recipient,
     });
+    const aiDbStatus =
+      ai.status === "approved" ? "ai_approved" :
+      ai.status === "rejected" ? "ai_rejected" : "needs_review";
     await supabaseAdmin
       .from("payment_submissions")
-      .update({ ai_status: ai.status, ai_notes: ai.notes, ai_extracted: ai.extracted })
+      .update({ ai_status: aiDbStatus, ai_notes: ai.notes, ai_extracted: ai.extracted })
       .eq("id", sub.id);
 
     if (ai.status !== "approved") {

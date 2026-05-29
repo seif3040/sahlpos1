@@ -24,6 +24,8 @@ import { Route as CustomersRouteImport } from './routes/customers'
 import { Route as CashRegisterRouteImport } from './routes/cash-register'
 import { Route as AppRouteImport } from './routes/app'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as PosSlugRouteImport } from './routes/pos.$slug'
+import { Route as CheckoutPlanRouteImport } from './routes/checkout.$plan'
 
 const SuppliersRoute = SuppliersRouteImport.update({
   id: '/suppliers',
@@ -100,6 +102,16 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PosSlugRoute = PosSlugRouteImport.update({
+  id: '/pos/$slug',
+  path: '/pos/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CheckoutPlanRoute = CheckoutPlanRouteImport.update({
+  id: '/checkout/$plan',
+  path: '/checkout/$plan',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -117,6 +129,8 @@ export interface FileRoutesByFullPath {
   '/sales': typeof SalesRoute
   '/settings': typeof SettingsRoute
   '/suppliers': typeof SuppliersRoute
+  '/checkout/$plan': typeof CheckoutPlanRoute
+  '/pos/$slug': typeof PosSlugRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -134,6 +148,8 @@ export interface FileRoutesByTo {
   '/sales': typeof SalesRoute
   '/settings': typeof SettingsRoute
   '/suppliers': typeof SuppliersRoute
+  '/checkout/$plan': typeof CheckoutPlanRoute
+  '/pos/$slug': typeof PosSlugRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -152,6 +168,8 @@ export interface FileRoutesById {
   '/sales': typeof SalesRoute
   '/settings': typeof SettingsRoute
   '/suppliers': typeof SuppliersRoute
+  '/checkout/$plan': typeof CheckoutPlanRoute
+  '/pos/$slug': typeof PosSlugRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -171,6 +189,8 @@ export interface FileRouteTypes {
     | '/sales'
     | '/settings'
     | '/suppliers'
+    | '/checkout/$plan'
+    | '/pos/$slug'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -188,6 +208,8 @@ export interface FileRouteTypes {
     | '/sales'
     | '/settings'
     | '/suppliers'
+    | '/checkout/$plan'
+    | '/pos/$slug'
   id:
     | '__root__'
     | '/'
@@ -205,6 +227,8 @@ export interface FileRouteTypes {
     | '/sales'
     | '/settings'
     | '/suppliers'
+    | '/checkout/$plan'
+    | '/pos/$slug'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -223,6 +247,8 @@ export interface RootRouteChildren {
   SalesRoute: typeof SalesRoute
   SettingsRoute: typeof SettingsRoute
   SuppliersRoute: typeof SuppliersRoute
+  CheckoutPlanRoute: typeof CheckoutPlanRoute
+  PosSlugRoute: typeof PosSlugRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -332,6 +358,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/pos/$slug': {
+      id: '/pos/$slug'
+      path: '/pos/$slug'
+      fullPath: '/pos/$slug'
+      preLoaderRoute: typeof PosSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/checkout/$plan': {
+      id: '/checkout/$plan'
+      path: '/checkout/$plan'
+      fullPath: '/checkout/$plan'
+      preLoaderRoute: typeof CheckoutPlanRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -351,6 +391,8 @@ const rootRouteChildren: RootRouteChildren = {
   SalesRoute: SalesRoute,
   SettingsRoute: SettingsRoute,
   SuppliersRoute: SuppliersRoute,
+  CheckoutPlanRoute: CheckoutPlanRoute,
+  PosSlugRoute: PosSlugRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
