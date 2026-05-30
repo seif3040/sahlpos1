@@ -31,6 +31,7 @@ export function MarketingShell({ children }: { children: ReactNode }) {
           <div className="flex gap-4">
             <Link to="/features">المميزات</Link>
             <Link to="/pricing">الأسعار</Link>
+            <Link to="/admin/login" className="opacity-60 hover:opacity-100">مدير المنصة</Link>
           </div>
         </div>
       </footer>
