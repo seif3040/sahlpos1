@@ -19,7 +19,7 @@ export const Route = createFileRoute("/settings")({
   component: () => (<RequireAuth level={3}><SettingsPage /></RequireAuth>),
 });
 
-interface Employee { id: string; name: string; role: string; pin: string; active: boolean }
+interface Employee { id: string; name: string; role: string; active: boolean }
 
 function SettingsPage() {
   const [shop, setShop] = useState({ shop_name: "", shop_phone: "", shop_address: "", currency: "ج.م", tax_percent: 14, receipt_header: "", receipt_footer: "", logo_url: "" as string | null });
