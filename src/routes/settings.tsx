@@ -32,7 +32,7 @@ function SettingsPage() {
   const load = async () => {
     const [{ data: s }, { data: e }] = await Promise.all([
       supabase.from("settings").select("*").eq("id", 1).maybeSingle(),
-      supabase.from("employees").select("id,name,role,pin,active").eq("active", true).order("name"),
+      supabase.from("employees").select("id,name,role,active").eq("active", true).order("name"),
     ]);
     if (s) setShop({
       shop_name: s.shop_name, shop_phone: s.shop_phone ?? "", shop_address: s.shop_address ?? "",
