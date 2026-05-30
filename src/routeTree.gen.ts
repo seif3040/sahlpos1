@@ -23,9 +23,11 @@ import { Route as ExpensesRouteImport } from './routes/expenses'
 import { Route as CustomersRouteImport } from './routes/customers'
 import { Route as CashRegisterRouteImport } from './routes/cash-register'
 import { Route as AppRouteImport } from './routes/app'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PosSlugRouteImport } from './routes/pos.$slug'
 import { Route as CheckoutPlanRouteImport } from './routes/checkout.$plan'
+import { Route as AdminLoginRouteImport } from './routes/admin.login'
 
 const SuppliersRoute = SuppliersRouteImport.update({
   id: '/suppliers',
@@ -97,6 +99,11 @@ const AppRoute = AppRouteImport.update({
   path: '/app',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -112,9 +119,15 @@ const CheckoutPlanRoute = CheckoutPlanRouteImport.update({
   path: '/checkout/$plan',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminLoginRoute = AdminLoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => AdminRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRouteWithChildren
   '/app': typeof AppRoute
   '/cash-register': typeof CashRegisterRoute
   '/customers': typeof CustomersRoute
@@ -129,11 +142,13 @@ export interface FileRoutesByFullPath {
   '/sales': typeof SalesRoute
   '/settings': typeof SettingsRoute
   '/suppliers': typeof SuppliersRoute
+  '/admin/login': typeof AdminLoginRoute
   '/checkout/$plan': typeof CheckoutPlanRoute
   '/pos/$slug': typeof PosSlugRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRouteWithChildren
   '/app': typeof AppRoute
   '/cash-register': typeof CashRegisterRoute
   '/customers': typeof CustomersRoute
@@ -148,12 +163,14 @@ export interface FileRoutesByTo {
   '/sales': typeof SalesRoute
   '/settings': typeof SettingsRoute
   '/suppliers': typeof SuppliersRoute
+  '/admin/login': typeof AdminLoginRoute
   '/checkout/$plan': typeof CheckoutPlanRoute
   '/pos/$slug': typeof PosSlugRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/admin': typeof AdminRouteWithChildren
   '/app': typeof AppRoute
   '/cash-register': typeof CashRegisterRoute
   '/customers': typeof CustomersRoute
@@ -168,6 +185,7 @@ export interface FileRoutesById {
   '/sales': typeof SalesRoute
   '/settings': typeof SettingsRoute
   '/suppliers': typeof SuppliersRoute
+  '/admin/login': typeof AdminLoginRoute
   '/checkout/$plan': typeof CheckoutPlanRoute
   '/pos/$slug': typeof PosSlugRoute
 }
@@ -175,6 +193,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/admin'
     | '/app'
     | '/cash-register'
     | '/customers'
@@ -189,11 +208,13 @@ export interface FileRouteTypes {
     | '/sales'
     | '/settings'
     | '/suppliers'
+    | '/admin/login'
     | '/checkout/$plan'
     | '/pos/$slug'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/admin'
     | '/app'
     | '/cash-register'
     | '/customers'
@@ -208,11 +229,13 @@ export interface FileRouteTypes {
     | '/sales'
     | '/settings'
     | '/suppliers'
+    | '/admin/login'
     | '/checkout/$plan'
     | '/pos/$slug'
   id:
     | '__root__'
     | '/'
+    | '/admin'
     | '/app'
     | '/cash-register'
     | '/customers'
@@ -227,12 +250,14 @@ export interface FileRouteTypes {
     | '/sales'
     | '/settings'
     | '/suppliers'
+    | '/admin/login'
     | '/checkout/$plan'
     | '/pos/$slug'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminRoute: typeof AdminRouteWithChildren
   AppRoute: typeof AppRoute
   CashRegisterRoute: typeof CashRegisterRoute
   CustomersRoute: typeof CustomersRoute
@@ -351,6 +376,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -372,11 +404,29 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CheckoutPlanRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/login': {
+      id: '/admin/login'
+      path: '/login'
+      fullPath: '/admin/login'
+      preLoaderRoute: typeof AdminLoginRouteImport
+      parentRoute: typeof AdminRoute
+    }
   }
 }
 
+interface AdminRouteChildren {
+  AdminLoginRoute: typeof AdminLoginRoute
+}
+
+const AdminRouteChildren: AdminRouteChildren = {
+  AdminLoginRoute: AdminLoginRoute,
+}
+
+const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminRoute: AdminRouteWithChildren,
   AppRoute: AppRoute,
   CashRegisterRoute: CashRegisterRoute,
   CustomersRoute: CustomersRoute,
