@@ -133,7 +133,7 @@ function SettingsPage() {
                   <TableRow key={e.id}>
                     <TableCell>{e.name}</TableCell>
                     <TableCell>{roleLabel(e.role)}</TableCell>
-                    <TableCell className="font-mono">{e.pin}</TableCell>
+                    <TableCell className="font-mono">••••</TableCell>
                     <TableCell className="text-left">
                       <Button size="icon" variant="ghost" onClick={() => { setPinDialog(e); setNewPin(""); }}><KeyRound className="h-4 w-4" /></Button>
                       <Button size="icon" variant="ghost" className="text-destructive" onClick={() => removeEmp(e.id)}><Trash2 className="h-4 w-4" /></Button>
