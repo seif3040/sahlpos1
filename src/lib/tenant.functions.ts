@@ -251,7 +251,7 @@ export const getPlanInfo = createServerFn({ method: "GET" })
     };
   });
 
-/** Public: lookup tenant by slug + auth as employee with matching PIN in that tenant */
+/** Public: lookup tenant by slug + sign in as employee with matching PIN. Returns session tokens, never the password. */
 export const findTenantEmployeeByPin = createServerFn({ method: "POST" })
   .inputValidator((d: { slug: string; pin: string }) => {
     if (!/^\d{4}$/.test(d.pin)) throw new Error("الرقم السري 4 أرقام");
@@ -259,10 +259,11 @@ export const findTenantEmployeeByPin = createServerFn({ method: "POST" })
     return d;
   })
   .handler(async ({ data }) => {
+    const failDelay = () => new Promise((r) => setTimeout(r, 400));
     const { data: tenant } = await supabaseAdmin
       .from("tenants").select("id,name,status").eq("slug", data.slug).maybeSingle();
-    if (!tenant) return { found: false as const, reason: "no_tenant" };
-    if (tenant.status !== "active") return { found: false as const, reason: "inactive" };
+    if (!tenant) { await failDelay(); return { found: false as const, reason: "no_tenant" }; }
+    if (tenant.status !== "active") { await failDelay(); return { found: false as const, reason: "inactive" }; }
 
     const { data: emps } = await supabaseAdmin
       .from("employees")
@@ -273,11 +274,18 @@ export const findTenantEmployeeByPin = createServerFn({ method: "POST" })
       .not("user_id", "is", null)
       .limit(1);
     const emp = emps?.[0];
-    if (!emp || !emp.user_id) return { found: false as const, reason: "no_pin" };
-    return {
-      found: true as const,
+    if (!emp || !emp.user_id) { await failDelay(); return { found: false as const, reason: "no_pin" }; }
+
+    const { data: session, error: signErr } = await supabaseAdmin.auth.signInWithPassword({
       email: `pin-${emp.id}@shop.local`,
       password: emp.pin,
+    });
+    if (signErr || !session.session) { await failDelay(); return { found: false as const, reason: "no_pin" }; }
+
+    return {
+      found: true as const,
+      accessToken: session.session.access_token,
+      refreshToken: session.session.refresh_token,
       mustResetPin: emp.must_reset_pin,
       employee: { id: emp.id, name: emp.name, role: emp.role },
       tenant: { name: tenant.name },

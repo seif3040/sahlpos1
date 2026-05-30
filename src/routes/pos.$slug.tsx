@@ -51,7 +51,7 @@ function TenantLoginPage() {
         setPin("");
         return;
       }
-      const { error } = await supabase.auth.signInWithPassword({ email: res.email, password: res.password });
+      const { error } = await supabase.auth.setSession({ access_token: res.accessToken, refresh_token: res.refreshToken });
       if (error) { toast.error("فشل تسجيل الدخول"); setPin(""); return; }
       await refresh();
       if (res.mustResetPin) {

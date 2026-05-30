@@ -19,7 +19,7 @@ export const Route = createFileRoute("/settings")({
   component: () => (<RequireAuth level={3}><SettingsPage /></RequireAuth>),
 });
 
-interface Employee { id: string; name: string; role: string; pin: string; active: boolean }
+interface Employee { id: string; name: string; role: string; active: boolean }
 
 function SettingsPage() {
   const [shop, setShop] = useState({ shop_name: "", shop_phone: "", shop_address: "", currency: "ج.م", tax_percent: 14, receipt_header: "", receipt_footer: "", logo_url: "" as string | null });
@@ -32,7 +32,7 @@ function SettingsPage() {
   const load = async () => {
     const [{ data: s }, { data: e }] = await Promise.all([
       supabase.from("settings").select("*").eq("id", 1).maybeSingle(),
-      supabase.from("employees").select("id,name,role,pin,active").eq("active", true).order("name"),
+      supabase.from("employees").select("id,name,role,active").eq("active", true).order("name"),
     ]);
     if (s) setShop({
       shop_name: s.shop_name, shop_phone: s.shop_phone ?? "", shop_address: s.shop_address ?? "",
@@ -133,7 +133,7 @@ function SettingsPage() {
                   <TableRow key={e.id}>
                     <TableCell>{e.name}</TableCell>
                     <TableCell>{roleLabel(e.role)}</TableCell>
-                    <TableCell className="font-mono">{e.pin}</TableCell>
+                    <TableCell className="font-mono">••••</TableCell>
                     <TableCell className="text-left">
                       <Button size="icon" variant="ghost" onClick={() => { setPinDialog(e); setNewPin(""); }}><KeyRound className="h-4 w-4" /></Button>
                       <Button size="icon" variant="ghost" className="text-destructive" onClick={() => removeEmp(e.id)}><Trash2 className="h-4 w-4" /></Button>

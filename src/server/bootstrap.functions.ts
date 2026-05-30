@@ -58,9 +58,8 @@ export const ensureDefaultOwner = createServerFn({ method: "POST" }).handler(asy
 });
 
 /**
- * Public PIN-to-email lookup for the login flow.
- * Does NOT return the PIN itself — only the synthetic email used for password sign-in.
- * The caller must already know the PIN to call this.
+ * Public PIN login: validates PIN, signs in server-side, returns session tokens.
+ * The PIN/password is never returned to the client. Adds a delay on failure.
  */
 export const findEmployeeByPin = createServerFn({ method: "POST" })
   .inputValidator((d: { pin: string }) => {
@@ -68,6 +67,7 @@ export const findEmployeeByPin = createServerFn({ method: "POST" })
     return d;
   })
   .handler(async ({ data }) => {
+    const failDelay = () => new Promise((r) => setTimeout(r, 400));
     const { data: emps, error } = await supabaseAdmin
       .from("employees")
       .select("id,user_id,name,role,pin,active")
@@ -76,13 +76,27 @@ export const findEmployeeByPin = createServerFn({ method: "POST" })
       .not("user_id", "is", null)
       .order("created_at", { ascending: true })
       .limit(1);
-    if (error) throw new Error(error.message);
+    if (error) {
+      await failDelay();
+      throw new Error(error.message);
+    }
     const emp = emps?.[0];
-    if (!emp || !emp.user_id) return { found: false as const };
-    return {
-      found: true as const,
+    if (!emp || !emp.user_id) {
+      await failDelay();
+      return { found: false as const };
+    }
+    const { data: session, error: signErr } = await supabaseAdmin.auth.signInWithPassword({
       email: `pin-${emp.id}@shop.local`,
       password: emp.pin,
+    });
+    if (signErr || !session.session) {
+      await failDelay();
+      return { found: false as const };
+    }
+    return {
+      found: true as const,
+      accessToken: session.session.access_token,
+      refreshToken: session.session.refresh_token,
       employee: { id: emp.id, name: emp.name, role: emp.role },
     };
   });
