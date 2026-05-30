@@ -27,7 +27,7 @@ export function MarketingShell({ children }: { children: ReactNode }) {
       <main className="flex-1">{children}</main>
       <footer className="border-t mt-12">
         <div className="container mx-auto px-4 py-8 text-sm text-muted-foreground flex flex-col md:flex-row justify-between gap-3">
-          <div>© {new Date().getFullYear()} sahl pos — نظام نقاط البيع للشركات المصرية</div>
+          <div>© {new Date().getFullYear()} sahl pos — نظام نقاط البيع للشركات</div>
           <div className="flex gap-4">
             <Link to="/features">المميزات</Link>
             <Link to="/pricing">الأسعار</Link>
