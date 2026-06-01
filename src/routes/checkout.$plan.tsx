@@ -199,7 +199,11 @@ function CheckoutPage() {
               </div>
               <div>
                 <Label htmlFor="em">البريد الإلكتروني *</Label>
-                <Input id="em" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" />
+                <Input id="em" type="email" required dir="ltr" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" />
+              </div>
+              <div>
+                <Label htmlFor="pw">كلمة المرور * (للدخول لاحقاً)</Label>
+                <Input id="pw" type="password" required minLength={8} maxLength={72} dir="ltr" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="8 أحرف على الأقل" />
               </div>
               <div>
                 <Label htmlFor="ph">رقم الموبايل *</Label>
