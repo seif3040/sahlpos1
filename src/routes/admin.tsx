@@ -107,7 +107,7 @@ function AdminDashboard() {
     setActing("approve");
     try {
       const r = await approve({ data: { id: selected.id, notes: note || undefined } });
-      toast.success(r.alreadyActive ? "الحساب مفعّل بالفعل" : `تم التفعيل: /pos/${r.slug}`);
+      toast.success(`تم التفعيل: /pos/${r.slug}`);
       setSelected(null);
       setNote("");
       void refresh(filter);
