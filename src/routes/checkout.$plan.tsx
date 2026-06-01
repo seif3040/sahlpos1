@@ -63,7 +63,7 @@ function CheckoutPage() {
       const base64 = await fileToBase64(file);
       const res = await submit({
         data: {
-          companyName, email, phone, plan: plan as "basic" | "pro" | "enterprise",
+          companyName, email, password, phone, plan: plan as "basic" | "pro" | "enterprise",
           method, screenshotBase64: base64, screenshotMime: file.type as "image/png" | "image/jpeg" | "image/webp",
         },
       });
