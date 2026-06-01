@@ -25,6 +25,7 @@ function CheckoutPage() {
   const [info, setInfo] = useState<{ name: string; price: number; vodafone: string; instapay: string; bank: string } | null>(null);
   const [companyName, setCompanyName] = useState("");
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [phone, setPhone] = useState("");
   const [method, setMethod] = useState<Method>("vodafone_cash");
   const [file, setFile] = useState<File | null>(null);
