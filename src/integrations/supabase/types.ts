@@ -340,6 +340,7 @@ export type Database = {
           desired_slug: string | null
           id: string
           method: Database["public"]["Enums"]["payment_method_type"]
+          owner_user_id: string | null
           plan: Database["public"]["Enums"]["plan_tier"]
           reviewed_at: string | null
           screenshot_url: string
@@ -365,6 +366,7 @@ export type Database = {
           desired_slug?: string | null
           id?: string
           method: Database["public"]["Enums"]["payment_method_type"]
+          owner_user_id?: string | null
           plan: Database["public"]["Enums"]["plan_tier"]
           reviewed_at?: string | null
           screenshot_url: string
@@ -390,6 +392,7 @@ export type Database = {
           desired_slug?: string | null
           id?: string
           method?: Database["public"]["Enums"]["payment_method_type"]
+          owner_user_id?: string | null
           plan?: Database["public"]["Enums"]["plan_tier"]
           reviewed_at?: string | null
           screenshot_url?: string

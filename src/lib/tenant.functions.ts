@@ -21,6 +21,7 @@ function slugify(input: string): string {
 const SubmitSchema = z.object({
   companyName: z.string().trim().min(2).max(80),
   email: z.string().trim().email().max(120),
+  password: z.string().min(8).max(72),
   phone: z.string().trim().min(8).max(20),
   plan: z.enum(["basic", "pro", "enterprise"]),
   method: z.enum(["vodafone_cash", "instapay", "bank_transfer"]),
@@ -83,10 +84,49 @@ async function aiVerifyScreenshot(
   }
 }
 
+/**
+ * Find an existing auth user by email or create one with the given password.
+ * If the user already exists, the supplied password is rejected (do not silently
+ * overwrite someone else's password).
+ */
+async function findOrCreateAuthUser(
+  email: string,
+  password: string,
+): Promise<{ userId: string; created: boolean }> {
+  const lower = email.toLowerCase();
+
+  // Try to create first
+  const { data: created, error: cErr } = await supabaseAdmin.auth.admin.createUser({
+    email: lower,
+    password,
+    email_confirm: true,
+  });
+  if (created?.user) return { userId: created.user.id, created: true };
+
+  // Existing user → verify the password matches by attempting a sign-in
+  if (cErr && /already|registered|exists/i.test(cErr.message)) {
+    const { data: sess, error: sErr } = await supabaseAdmin.auth.signInWithPassword({
+      email: lower,
+      password,
+    });
+    if (sErr || !sess.user) {
+      throw new Error(
+        "هذا الإيميل مستخدم بالفعل وكلمة المرور مختلفة. سجّل دخول أو استخدم إيميل آخر.",
+      );
+    }
+    return { userId: sess.user.id, created: false };
+  }
+  throw new Error(cErr?.message || "فشل إنشاء الحساب");
+}
+
 export const submitPayment = createServerFn({ method: "POST" })
   .inputValidator((d) => SubmitSchema.parse(d))
   .handler(async ({ data }) => {
     const expectedAmount = PLAN_PRICE[data.plan];
+
+    // 0) Pre-create the owner auth user with their real email + chosen password.
+    //    They can sign in immediately at /login, even while the request is pending.
+    const { userId: ownerUserId } = await findOrCreateAuthUser(data.email, data.password);
 
     // 1) load platform settings for recipient
     const { data: settings } = await supabaseAdmin
@@ -115,13 +155,13 @@ export const submitPayment = createServerFn({ method: "POST" })
       .createSignedUrl(path, 60 * 60);
     const signedUrl = signed?.signedUrl ?? "";
 
-    // 3) Insert submission
+    // 3) Insert submission (linked to the pre-created owner user)
     const desiredSlug = slugify(data.companyName);
     const { data: sub, error: subErr } = await supabaseAdmin
       .from("payment_submissions")
       .insert({
         company_name: data.companyName,
-        contact_email: data.email,
+        contact_email: data.email.toLowerCase(),
         contact_phone: data.phone,
         desired_slug: desiredSlug,
         plan: data.plan,
@@ -129,6 +169,7 @@ export const submitPayment = createServerFn({ method: "POST" })
         amount: expectedAmount,
         screenshot_url: path,
         status: "pending",
+        owner_user_id: ownerUserId,
       })
       .select("id")
       .single();
@@ -157,77 +198,116 @@ export const submitPayment = createServerFn({ method: "POST" })
       };
     }
 
-    // 5) Approved → create tenant + owner
-    let slug = desiredSlug;
-    for (let i = 0; i < 8; i++) {
-      const { data: exists } = await supabaseAdmin
-        .from("tenants").select("id").eq("slug", slug).maybeSingle();
-      if (!exists) break;
-      slug = `${desiredSlug}-${Math.random().toString(36).slice(2, 5)}`;
-    }
-
-    const { data: tenant, error: tErr } = await supabaseAdmin
-      .from("tenants")
-      .insert({
-        name: data.companyName,
-        slug,
-        contact_email: data.email,
-        contact_phone: data.phone,
-        plan: data.plan,
-        status: "active",
-        subscription_ends_at: new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString(),
-      })
-      .select("id")
-      .single();
-    if (tErr || !tenant) throw new Error(tErr?.message || "فشل إنشاء الشركة");
-
-    // owner employee row with PIN 0000 + must_reset
-    const { data: emp, error: eErr } = await supabaseAdmin
-      .from("employees")
-      .insert({
-        tenant_id: tenant.id,
-        name: "صاحب الشركة",
-        pin: "0000",
-        role: "owner",
-        active: true,
-        must_reset_pin: true,
-      })
-      .select("id")
-      .single();
-    if (eErr || !emp) throw new Error(eErr?.message || "فشل إنشاء حساب المالك");
-
-    // auth user
-    const ownerEmail = `pin-${emp.id}@shop.local`;
-    const { data: authUser, error: aErr } = await supabaseAdmin.auth.admin.createUser({
-      email: ownerEmail, password: "0000", email_confirm: true,
-    });
-    if (aErr || !authUser?.user) throw new Error(aErr?.message || "فشل إنشاء المستخدم");
-
-    await supabaseAdmin.from("employees").update({ user_id: authUser.user.id }).eq("id", emp.id);
-    await supabaseAdmin.from("user_roles").insert({ user_id: authUser.user.id, role: "owner" });
-    await supabaseAdmin.from("tenants").update({ owner_user_id: authUser.user.id }).eq("id", tenant.id);
-
-    await supabaseAdmin.from("tenant_subscriptions").insert({
-      tenant_id: tenant.id,
-      plan: data.plan,
-      amount: expectedAmount,
-      expires_at: new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString(),
-      payment_id: sub.id,
-    });
-
-    await supabaseAdmin
-      .from("payment_submissions")
-      .update({ tenant_id: tenant.id, status: "admin_approved", account_created: true, reviewed_at: new Date().toISOString() })
-      .eq("id", sub.id);
-
+    // 5) AI approved → activate tenant immediately
+    const slug = await activateTenantForSubmission(sub.id);
     return {
       ok: true,
       status: "approved" as const,
-      notes: `تم تفعيل حسابك! ادخل من /pos/${slug} بالرقم 0000 ثم غيّره فوراً.`,
+      notes: `تم تفعيل حسابك! سجّل الدخول بنفس الإيميل وكلمة المرور.`,
       slug,
       submissionId: sub.id,
     };
   });
+
+/**
+ * Shared activation routine — used by AI auto-approve and by the platform
+ * admin's manual approve. Idempotent: re-running on an already-active
+ * submission returns the existing slug.
+ */
+export async function activateTenantForSubmission(submissionId: string): Promise<string> {
+  const { data: sub, error } = await supabaseAdmin
+    .from("payment_submissions")
+    .select("*")
+    .eq("id", submissionId)
+    .maybeSingle();
+  if (error || !sub) throw new Error("الطلب غير موجود");
+
+  if (sub.account_created && sub.tenant_id) {
+    const { data: t } = await supabaseAdmin
+      .from("tenants").select("slug").eq("id", sub.tenant_id).maybeSingle();
+    return t?.slug ?? "";
+  }
+
+  if (!sub.owner_user_id) {
+    throw new Error(
+      "هذا الطلب قديم وما فيهوش حساب مالك مرتبط. اطلب من العميل يعيد التسجيل بإيميل وكلمة مرور.",
+    );
+  }
+
+  // Unique slug
+  const desired = sub.desired_slug || slugify(sub.company_name);
+  let slug = desired;
+  for (let i = 0; i < 8; i++) {
+    const { data: exists } = await supabaseAdmin
+      .from("tenants").select("id").eq("slug", slug).maybeSingle();
+    if (!exists) break;
+    slug = `${desired}-${Math.random().toString(36).slice(2, 5)}`;
+  }
+
+  const { data: tenant, error: tErr } = await supabaseAdmin
+    .from("tenants")
+    .insert({
+      name: sub.company_name,
+      slug,
+      contact_email: sub.contact_email,
+      contact_phone: sub.contact_phone,
+      plan: sub.plan,
+      status: "active",
+      owner_user_id: sub.owner_user_id,
+      subscription_ends_at: new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString(),
+    })
+    .select("id")
+    .single();
+  if (tErr || !tenant) throw new Error(tErr?.message || "فشل إنشاء الشركة");
+
+  // Owner employee row — PIN 0000, owner can change it later from settings.
+  const { data: emp, error: eErr } = await supabaseAdmin
+    .from("employees")
+    .insert({
+      tenant_id: tenant.id,
+      name: "صاحب الشركة",
+      pin: "0000",
+      role: "owner",
+      active: true,
+      must_reset_pin: true,
+      user_id: sub.owner_user_id,
+    })
+    .select("id")
+    .single();
+  if (eErr || !emp) throw new Error(eErr?.message || "فشل إنشاء حساب المالك");
+
+  // Ensure owner role exists in user_roles (idempotent)
+  const { data: existingRole } = await supabaseAdmin
+    .from("user_roles")
+    .select("id")
+    .eq("user_id", sub.owner_user_id)
+    .eq("role", "owner")
+    .maybeSingle();
+  if (!existingRole) {
+    await supabaseAdmin.from("user_roles").insert({
+      user_id: sub.owner_user_id,
+      role: "owner",
+    });
+  }
+
+  await supabaseAdmin.from("tenant_subscriptions").insert({
+    tenant_id: tenant.id,
+    plan: sub.plan,
+    amount: Number(sub.amount) || PLAN_PRICE[sub.plan as Plan],
+    expires_at: new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString(),
+    payment_id: sub.id,
+  });
+
+  await supabaseAdmin
+    .from("payment_submissions")
+    .update({
+      tenant_id: tenant.id,
+      account_created: true,
+    })
+    .eq("id", sub.id);
+
+  return slug;
+}
 
 export const getPlanInfo = createServerFn({ method: "GET" })
   .inputValidator((d: { plan: string }) => {
@@ -251,7 +331,7 @@ export const getPlanInfo = createServerFn({ method: "GET" })
     };
   });
 
-/** Public: lookup tenant by slug + sign in as employee with matching PIN. Returns session tokens, never the password. */
+/** Public PIN login per-tenant (in-store cashier/manager flow). */
 export const findTenantEmployeeByPin = createServerFn({ method: "POST" })
   .inputValidator((d: { slug: string; pin: string }) => {
     if (!/^\d{4}$/.test(d.pin)) throw new Error("الرقم السري 4 أرقام");
@@ -276,6 +356,8 @@ export const findTenantEmployeeByPin = createServerFn({ method: "POST" })
     const emp = emps?.[0];
     if (!emp || !emp.user_id) { await failDelay(); return { found: false as const, reason: "no_pin" }; }
 
+    // PIN-based sessions still use the legacy fake-email accounts when present;
+    // owners signed up via /checkout sign in by email+password at /login instead.
     const { data: session, error: signErr } = await supabaseAdmin.auth.signInWithPassword({
       email: `pin-${emp.id}@shop.local`,
       password: emp.pin,
@@ -318,15 +400,62 @@ export const setupOwnerPin = createServerFn({ method: "POST" })
       .maybeSingle();
     if (!emp) throw new Error("الموظف غير موجود");
 
-    // ensure PIN unique within tenant
     const { data: clash } = await supabaseAdmin
       .from("employees")
       .select("id").eq("tenant_id", emp.tenant_id).eq("pin", data.newPin).eq("active", true).neq("id", emp.id).maybeSingle();
     if (clash) throw new Error("الرقم مستخدم بالفعل");
 
-    await supabaseAdmin.auth.admin.updateUserById(userId, { password: data.newPin });
     await supabaseAdmin.from("employees")
       .update({ pin: data.newPin, name: data.name.trim(), must_reset_pin: false })
       .eq("id", emp.id);
     return { ok: true };
+  });
+
+/**
+ * Authenticated: figure out where to send the currently signed-in user.
+ * - Platform admin → /admin
+ * - Owner of an active tenant → /pos/{slug}
+ * - Owner of a pending submission → /pending status info
+ * - Otherwise → no destination (let UI show "ابدأ الآن")
+ */
+export const getMyDestination = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { userId } = context;
+
+    const { data: admin } = await supabaseAdmin
+      .from("platform_admins").select("user_id").eq("user_id", userId).maybeSingle();
+    if (admin) return { kind: "admin" as const };
+
+    const { data: tenant } = await supabaseAdmin
+      .from("tenants")
+      .select("slug,name,status")
+      .eq("owner_user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (tenant && tenant.status === "active") {
+      return { kind: "tenant" as const, slug: tenant.slug, name: tenant.name };
+    }
+
+    const { data: sub } = await supabaseAdmin
+      .from("payment_submissions")
+      .select("status,company_name,created_at,admin_notes,ai_status,ai_notes,account_created")
+      .eq("owner_user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (sub) {
+      return {
+        kind: "pending" as const,
+        company: sub.company_name,
+        status: sub.status,
+        adminNotes: sub.admin_notes,
+        aiStatus: sub.ai_status,
+        aiNotes: sub.ai_notes,
+        createdAt: sub.created_at,
+      };
+    }
+
+    return { kind: "none" as const };
   });

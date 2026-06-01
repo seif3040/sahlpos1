@@ -25,6 +25,7 @@ function CheckoutPage() {
   const [info, setInfo] = useState<{ name: string; price: number; vodafone: string; instapay: string; bank: string } | null>(null);
   const [companyName, setCompanyName] = useState("");
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [phone, setPhone] = useState("");
   const [method, setMethod] = useState<Method>("vodafone_cash");
   const [file, setFile] = useState<File | null>(null);
@@ -62,7 +63,7 @@ function CheckoutPage() {
       const base64 = await fileToBase64(file);
       const res = await submit({
         data: {
-          companyName, email, phone, plan: plan as "basic" | "pro" | "enterprise",
+          companyName, email, password, phone, plan: plan as "basic" | "pro" | "enterprise",
           method, screenshotBase64: base64, screenshotMime: file.type as "image/png" | "image/jpeg" | "image/webp",
         },
       });
@@ -198,7 +199,11 @@ function CheckoutPage() {
               </div>
               <div>
                 <Label htmlFor="em">البريد الإلكتروني *</Label>
-                <Input id="em" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" />
+                <Input id="em" type="email" required dir="ltr" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" />
+              </div>
+              <div>
+                <Label htmlFor="pw">كلمة المرور * (للدخول لاحقاً)</Label>
+                <Input id="pw" type="password" required minLength={8} maxLength={72} dir="ltr" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="8 أحرف على الأقل" />
               </div>
               <div>
                 <Label htmlFor="ph">رقم الموبايل *</Label>
