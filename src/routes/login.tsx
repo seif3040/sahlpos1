@@ -51,7 +51,7 @@ function LoginPage() {
       return;
     }
     if (d.kind === "tenant") {
-      navigate({ to: "/pos/$slug", params: { slug: d.slug } });
+      navigate({ to: "/app" });
       return;
     }
     if (d.kind === "pending") {
